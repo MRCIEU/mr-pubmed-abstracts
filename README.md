@@ -44,6 +44,7 @@ The `scripts/openai-extract.py` script will then use the OpenAI API to generate 
 > - disease of the skin and subcutaneous tissue
 > - disease of the musculoskeletal system and connective tissue
 > - disease of the genitourinary system
+> 
 > If an exposure or outcome does not fit into any of these groups, provide a new group name. Provide your answer in strict json format without markdown code blocks.
 
 An example output looks like:
