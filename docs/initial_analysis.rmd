@@ -1,0 +1,157 @@
+---
+title: "Initial analysis of OpenAI abstract summaries"
+author: "Gibran Hemani"
+date: "2024-05-25"
+---
+
+```{r}
+library(here)
+library(dplyr)
+library(jsonlite)
+library(lubridate)
+library(ggplot2)
+```
+
+```{r}
+a <- jsonlite::read_json(here("data", "pubmed.json")) %>%
+    lapply(., function(x) {
+        x <- as_tibble(x)
+        x
+    }) %>% 
+    bind_rows() %>%
+    mutate(
+        pub_date=ymd(pub_date),
+        week=ceiling_date(pub_date, "weeks"),
+    )
+
+parse_res <- function(x) {
+    o <- list()
+    if(length(x$exposures) > 0) {
+        if(!"id" %in% names(x$exposures)) {
+            o$exposure <- tibble(
+                pmid=x$pmid,
+                what = "exposure",
+                trait = sapply(x$exposures, function(y) { if("trait" %in% names(y)) y$trait else NA_character_}),
+                category = sapply(x$exposures, function(y) {
+                    if("category" %in% names(y)) {y$category } 
+                    else if("group" %in% names(y)) {y$group} 
+                    else {NA_character_}
+                })
+            )
+        } else {
+            o$exposure <- tibble(
+                pmid=x$pmid,
+                what = "exposure",
+                trait = x$exposures$trait,
+                category = x$exposures$category
+            )
+        }
+    } else {
+        o$exposure <- tibble(
+            pmid=x$pmid,
+            what = "exposure",
+            trait = "NONE",
+            category = NA_character_
+        )
+    }
+    if(length(x$outcomes) > 0) {
+        if(!"id" %in% names(x$outcomes)) {
+            o$outcome <- tibble(
+                pmid=x$pmid,
+                what = "outcome",
+                trait = sapply(x$outcomes, function(y) { if("trait" %in% names(y)) y$trait else NA_character_}),
+                category = sapply(x$outcomes, function(y) {
+                    if("category" %in% names(y)) {y$category } 
+                    else if("group" %in% names(y)) {y$group} 
+                    else {NA_character_}
+                })
+            )
+        } else {
+            o$outcome <- tibble(
+                pmid=x$pmid,
+                what = "outcome",
+                trait = x$outcomes$trait,
+                category = x$outcomes$category
+            )
+        }
+    } else {
+        o$outcome <- tibble(
+            pmid=x$pmid,
+            what = "outcome",
+            trait = "NONE",
+            category = NA_character_
+        )
+    }
+    bind_rows(o)    
+}
+
+b <- jsonlite::read_json(here("data", "pubmed_abstracts.json")) 
+
+b1 <- b %>%
+{
+    lapply(., function(x) {
+        tryCatch({
+            parse_res(x)
+        }, error=function(e) {
+            return(NULL)
+        })
+    })
+} %>% bind_rows()
+
+dat <- inner_join(a, b1, by="pmid")
+
+str(dat)
+```
+
+```{r}
+permitted_categories <- c("molecular","socioeconomic","environmental","behavioural","anthropmetric","clinical measures","infectious disease","neoplasm","disease of the blood and blood-forming organs","metabolic disease","mental disorder","disease of the nervous system","disease of the eye and adnexa","disease of the ear and mastoid process","disease of the circulatory system","disease of the digestive system","disease of the skin and subcutaneous tissue","disease of the musculoskeletal system and connective tissue","disease of the genitourinary system")
+```
+
+```{r}
+temp1 <- dat %>%
+    group_by(pmid, what) %>%
+    filter(!duplicated(category)) %>%
+    ungroup() %>%
+    mutate(category = tolower(category)) %>%
+    filter(category %in% permitted_categories)
+
+temp2 <- filter(dat, !duplicated(pmid)) %>%
+    group_by(week) %>%
+    summarise(npubs=n())
+
+temp3 <- temp1 %>%
+    group_by(what, week, category) %>%
+    summarise(n=n()) %>%
+    inner_join(., temp2, by="week") %>%
+    mutate(prop=n/npubs)
+```
+
+```{r}
+ggplot(temp3, aes(x=week, y=n, colour=what)) + geom_smooth() + facet_wrap(~category, scales="free_y")
+```
+
+```{r}
+temp1 %>% group_by(what, category) %>% summarise(n=n()) %>% arrange(desc(n)) %>%
+ggplot(., aes(x=reorder(category, n), y=n, fill=what)) + geom_bar(stat="identity") + coord_flip() + theme(legend.position="bottom")
+```
+
+
+```{r}
+nonecount <- group_by(b1, pmid) %>%
+    summarise(NONE = sum(trait == "NONE")) %>%
+    inner_join(., a %>% select(pmid, pub_date), by="pmid")
+table(nonecount$NONE)
+```
+
+```{r}
+summary(lm(NONE ~ I(today() - pub_date), data=nonecount))
+```
+
+```{r, eval=FALSE, echo=FALSE}
+missing_pmids <- a$pmid[!a$pmid %in% b1$pmid]
+
+length(missing_pmids)
+subset(a, pmid %in% missing_pmids)$pub_date
+
+write.table(missing_pmids, here("data", "missing_pmids.txt"), row.names=FALSE, col.names=FALSE, qu=FALSE)
+```

@@ -105,7 +105,6 @@ Conclusion: This research underscores the necessity of rigorous air pollutant su
 with open("data/pubmed.json") as f:
     a = json.load(f)
 
-
 result = []
 for i in range(len(a)):
     print(i)
@@ -129,3 +128,49 @@ for i in range(len(a)):
     if i % 100 == 0:
         with open("data/pubmed_abstracts.json", "w") as f:
             json.dump(result, f)
+
+with open("data/pubmed_abstracts.json", "w") as f:
+    json.dump(result, f)
+
+with open("data/missing_pmids.txt") as f:
+    m = [line.rstrip() for line in f]
+
+a = [x for x in a if x['pmid'] in m]
+len(a)
+
+result = []
+for i in range(len(a)):
+    print(i)
+    if 'ab' not in a[i].keys():
+        continue
+    try:        
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+                messages=[{"role": "system", "content": "You are a helpful assistant."},
+                        abstract3,
+                        prompt,
+                        example_output,
+                        {"role": "user", "content": bytes(a[i]['ab'], 'utf-8').decode('utf-8', 'ignore')},
+                        prompt],
+        )
+        o = json.loads(response.choices[0].message.content)
+        o['pmid'] = a[i]['pmid']
+        result.append(o)
+    except:
+        continue
+    if i % 100 == 0:
+        with open("data/pubmed_abstracts2.json", "w") as f:
+            json.dump(result, f)
+
+with open("data/pubmed_abstracts2.json", "w") as f:
+    json.dump(result, f)
+
+with open("data/pubmed_abstracts.json") as f:
+    r = json.load(f)
+
+res = r + result
+len(res)
+
+with open("data/pubmed_abstracts.json", "w") as f:
+    json.dump(res, f)
+
