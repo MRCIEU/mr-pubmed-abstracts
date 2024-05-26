@@ -47,6 +47,18 @@ The `scripts/openai-extract.py` script will then use the OpenAI API to generate 
 > 
 > If an exposure or outcome does not fit into any of these groups, provide a new group name. Provide your answer in strict json format without markdown code blocks.
 
+For an example abstract:
+
+
+> Background: The association between air pollution, lung function, gastroesophageal reflux disease, and Non-alcoholic fatty liver disease (NAFLD) remains inconclusive. Previous studies were not convincing due to confounding factors and reverse causality. We aim to investigate the causal relationship between air pollution, lung function, gastroesophageal reflux disease, and NAFLD using Mendelian randomization analysis.
+> 
+> Methods: In this study, univariate Mendelian randomization analysis was conducted first. Subsequently, Steiger testing was performed to exclude the possibility of reverse association. Finally, significant risk factors identified from the univariate Mendelian analysis, as well as important factors affecting NAFLD from previous observational studies (type 2 diabetes and body mass index), were included in the multivariable Mendelian randomization analysis.
+>
+> Results: The results of the univariable Mendelian randomization analysis showed a positive correlation between particulate matter 2.5, gastroesophageal reflux disease, and NAFLD. There was a negative correlation between forced expiratory volume in 1 s, forced vital capacity, and NAFLD. The multivariable Mendelian randomization analysis indicated a direct causal relationship between gastroesophageal reflux disease (OR = 1.537, p = 0.011), type 2 diabetes (OR = 1.261, p < 0.001), and NAFLD.
+>
+> Conclusion: This Mendelian randomization study confirmed the causal relationships between air pollution, lung function, gastroesophageal reflux, and NAFLD. Furthermore, gastroesophageal reflux and type 2 diabetes were identified as independent risk factors for NAFLD, having a direct causal connection with the occurrence of NAFLD.
+
+
 An example output looks like:
 
 ```json
