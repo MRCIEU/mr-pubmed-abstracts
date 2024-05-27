@@ -182,7 +182,8 @@ write.table(missing_pmids, here("data", "missing_pmids.txt"), row.names=FALSE, c
 
 ```{r}
 abstracts <- a
-traits <- b1
+traits <- b1 %>%
+    mutate(category = tolower(category), permitted_category = category %in% permitted_categories)
 str(traits)
 str(abstracts)
 
