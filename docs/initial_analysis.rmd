@@ -24,6 +24,23 @@ a <- jsonlite::read_json(here("data", "pubmed.json")) %>%
         week=ceiling_date(pub_date, "weeks"),
     )
 
+a1 <- jsonlite::read_json(here("data", "pubmed_new.json")) %>%
+    lapply(., function(x) {
+        x <- as_tibble(x)
+        x
+    }) %>% 
+    bind_rows() %>%
+    mutate(
+        pub_date=ymd(pub_date),
+        week=ceiling_date(pub_date, "weeks"),
+    )
+
+a <- bind_rows(a, a1)
+dim(a)
+length(unique(a$pmid))
+```
+
+```{r}
 parse_res <- function(x) {
     o <- list()
     if(length(x$exposures) > 0) {
@@ -86,6 +103,8 @@ parse_res <- function(x) {
 }
 
 b <- jsonlite::read_json(here("data", "pubmed_abstracts.json")) 
+bnew <- jsonlite::read_json(here("data", "pubmed_abstracts_new.json")) 
+b <- c(b, bnew)
 
 b1 <- b %>%
 {
@@ -101,10 +120,11 @@ b1 <- b %>%
 dat <- inner_join(a, b1, by="pmid")
 
 str(dat)
+length(unique(dat$pmid))
 ```
 
 ```{r}
-permitted_categories <- c("molecular","socioeconomic","environmental","behavioural","anthropmetric","clinical measures","infectious disease","neoplasm","disease of the blood and blood-forming organs","metabolic disease","mental disorder","disease of the nervous system","disease of the eye and adnexa","disease of the ear and mastoid process","disease of the circulatory system","disease of the digestive system","disease of the skin and subcutaneous tissue","disease of the musculoskeletal system and connective tissue","disease of the genitourinary system")
+permitted_categories <- c("molecular","socioeconomic","environmental","behavioural","anthropometric","clinical measures","infectious disease","neoplasm","disease of the blood and blood-forming organs","metabolic disease","mental disorder","disease of the nervous system","disease of the eye and adnexa","disease of the ear and mastoid process","disease of the circulatory system","disease of the digestive system","disease of the skin and subcutaneous tissue","disease of the musculoskeletal system and connective tissue","disease of the genitourinary system")
 ```
 
 ```{r}
@@ -114,6 +134,9 @@ temp1 <- dat %>%
     ungroup() %>%
     mutate(category = tolower(category)) %>%
     filter(category %in% permitted_categories)
+
+dim(temp1)
+subset(temp1, category == "anthropometric")$trait %>% table()
 
 temp2 <- filter(dat, !duplicated(pmid)) %>%
     group_by(week) %>%
@@ -155,3 +178,14 @@ subset(a, pmid %in% missing_pmids)$pub_date
 
 write.table(missing_pmids, here("data", "missing_pmids.txt"), row.names=FALSE, col.names=FALSE, qu=FALSE)
 ```
+
+
+```{r}
+abstracts <- a
+traits <- b1
+str(traits)
+str(abstracts)
+
+save(traits, abstracts, file=here("data", "results.RData"))
+```
+

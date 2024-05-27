@@ -29,7 +29,7 @@ The `scripts/openai-extract.py` script will then use the OpenAI API to generate 
 > - socioeconomic
 > - environmental
 > - behavioural
-> - anthropmetric
+> - anthropometric
 > - clinical measures
 > - infectious disease
 > - neoplasm

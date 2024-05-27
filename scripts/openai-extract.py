@@ -26,12 +26,12 @@ Results: The results of the univariable Mendelian randomization analysis showed 
 
 Conclusion: This Mendelian randomization study confirmed the causal relationships between air pollution, lung function, gastroesophageal reflux, and NAFLD. Furthermore, gastroesophageal reflux and type 2 diabetes were identified as independent risk factors for NAFLD, having a direct causal connection with the occurrence of NAFLD."""}
 
-prompt = {"role": "user", "content": """What are the exposures and outcomes in this abstract? If there are multiple exposures or outcomes, provide them all. If there are no exposures or outcomes, provide an empty list. Also categorize the exposures and outcomes into the following groups: 
+prompt = {"role": "user", "content": """What are the exposures and outcomes in this abstract? If there are multiple exposures or outcomes, provide them all. If there are no exposures or outcomes, provide an empty list. Also categorize the exposures and outcomes into the following groups using the exact category names provided: 
 - molecular
 - socioeconomic
 - environmental
 - behavioural
-- anthropmetric
+- anthropometric
 - clinical measures
 - infectious disease
 - neoplasm
@@ -46,7 +46,7 @@ prompt = {"role": "user", "content": """What are the exposures and outcomes in t
 - disease of the skin and subcutaneous tissue
 - disease of the musculoskeletal system and connective tissue
 - disease of the genitourinary system
-If an exposure or outcome does not fit into any of these groups, provide a new group name. Provide your answer in strict json format without markdown code blocks."""}
+If an exposure or outcome does not fit into any of these groups, provide a new group name. Provide your answer in strict json format using exactly the format as the example output and without markdown code blocks."""}
 
 
 example_output = {"role": "assistant", "content": """
@@ -132,6 +132,8 @@ for i in range(len(a)):
 with open("data/pubmed_abstracts.json", "w") as f:
     json.dump(result, f)
 
+##
+
 with open("data/missing_pmids.txt") as f:
     m = [line.rstrip() for line in f]
 
@@ -173,4 +175,46 @@ len(res)
 
 with open("data/pubmed_abstracts.json", "w") as f:
     json.dump(res, f)
+
+
+##
+
+def openai_prompt(abstract, pmid):
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+            messages=[{"role": "system", "content": "You are a helpful assistant."},
+                    abstract3,
+                    prompt,
+                    example_output,
+                    {"role": "user", "content": bytes(abstract, 'utf-8').decode('utf-8', 'ignore')},
+                    prompt],
+    )
+    o = json.loads(response.choices[0].message.content)
+    o['pmid'] = pmid
+    return o
+
+
+with open("data/pubmed_new.json") as f:
+    a = json.load(f)
+
+openai_prompt(a[0]['ab'], a[0]['pmid'])
+
+result = []
+for i in range(len(a)):
+    print(i)
+    if 'ab' not in a[i].keys():
+        continue
+    try:        
+        o = openai_prompt(a[i]['ab'], a[i]['pmid'])
+        result.append(o)
+    except:
+        continue
+    if i % 100 == 0:
+        with open("data/pubmed_abstracts_new.json", "w") as f:
+            json.dump(result, f)
+
+with open("data/pubmed_abstracts_new.json", "w") as f:
+    json.dump(result, f)
+
+
 
