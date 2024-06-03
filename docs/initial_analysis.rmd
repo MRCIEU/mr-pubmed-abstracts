@@ -99,13 +99,28 @@ parse_res <- function(x) {
             category = NA_character_
         )
     }
-    bind_rows(o)    
+    o <- bind_rows(o)
+    if("methods" %in% names(x)) {
+        m <- tibble(
+            pmid=x$pmid,
+            methods = unlist(x$methods)
+        )
+    } else {
+        m <- tibble()    
+    }
+    if("results" %in% names(x)) {
+        r <- tibble(
+            pmid=x$pmid,
+            null = x$results$null,
+            nonnull = x$results$`non-null`
+        )
+    } else {
+        r <- tibble()    
+    }
+    return(list(o=o, m=m, r=r))
 }
 
-b <- jsonlite::read_json(here("data", "pubmed_abstracts.json")) 
-bnew <- jsonlite::read_json(here("data", "pubmed_abstracts_new.json")) 
-b <- c(b, bnew)
-
+b <- jsonlite::read_json(here("data", "pubmed_abstracts3.json")) 
 b1 <- b %>%
 {
     lapply(., function(x) {
@@ -115,9 +130,15 @@ b1 <- b %>%
             return(NULL)
         })
     })
-} %>% bind_rows()
+}
 
-dat <- inner_join(a, b1, by="pmid")
+traits <- lapply(b1, function(x) x$o) %>% bind_rows()
+meth <- lapply(b1, function(x) x$m) %>% bind_rows()
+nulls <- lapply(b1, function(x) x$r) %>% bind_rows()
+```
+
+```{r}
+dat <- inner_join(a, traits, by="pmid")
 
 str(dat)
 length(unique(dat$pmid))
@@ -126,6 +147,46 @@ length(unique(dat$pmid))
 ```{r}
 permitted_categories <- c("molecular","socioeconomic","environmental","behavioural","anthropometric","clinical measures","infectious disease","neoplasm","disease of the blood and blood-forming organs","metabolic disease","mental disorder","disease of the nervous system","disease of the eye and adnexa","disease of the ear and mastoid process","disease of the circulatory system","disease of the digestive system","disease of the skin and subcutaneous tissue","disease of the musculoskeletal system and connective tissue","disease of the genitourinary system")
 ```
+
+```{r}
+permitted_methods <- c(
+    "two-sample mendelian randomization",
+    "multivariable mendelian randomization",
+    "colocalization",
+    "network mendelian randomization",
+    "triangulation",
+    "reverse mendelian randomization",
+    "one-sample mendelian randomization",
+    "negative controls",
+    "sensitivity analysis",
+    "non-linear mendelian randomization",
+    "bi-directional mendelian randomization",
+    "within-family mendelian randomization"
+)
+
+meth$methods <- tolower(meth$methods)
+meth1 <- subset(meth, methods %in% permitted_methods)
+table(tolower(meth1$methods)
+meth2 <- subset(meth, !methods %in% permitted_methods)
+sum(grepl("^mendelian randomization$", meth2$methods), ignore.case=TRUE)
+sum(grepl("^mendelian randomisation$", meth2$methods), ignore.case=TRUE)
+table(table(tolower(meth2$methods)))
+
+meth2 %>% group_by(methods) %>% summarise(n=n()) %>% arrange(desc(n)) %>% head(100) %>% as.data.frame
+
+# "heritability", "heritability analysis",
+# "summary", "two-sample mendelian randomization",
+# "^mendelian randomization$", "one-sample mendelian randomization",
+# "multivariate mendelian randomization", "multivariable mendelian randomization",
+# "bidirectional mendelian randomization", "bi-directional mendelian randomization",
+```
+
+```{r}
+table(nulls$null)
+table(nulls$nonnull)
+arrange(nulls, desc(null))
+```
+
 
 ```{r}
 temp1 <- dat %>%
@@ -160,7 +221,7 @@ ggplot(., aes(x=reorder(category, n), y=n, fill=what)) + geom_bar(stat="identity
 
 
 ```{r}
-nonecount <- group_by(b1, pmid) %>%
+nonecount <- group_by(traits, pmid) %>%
     summarise(NONE = sum(trait == "NONE")) %>%
     inner_join(., a %>% select(pmid, pub_date), by="pmid")
 table(nonecount$NONE)
@@ -181,12 +242,27 @@ write.table(missing_pmids, here("data", "missing_pmids.txt"), row.names=FALSE, c
 
 
 ```{r}
+authors <- jsonlite::read_json(here("data", "pubmed_authors.json")) %>%
+    lapply(., \(x) {
+        tibble(pmid=x$pmid, country=unlist(x$country), institution=unlist(x$institution))
+    }) %>%
+    bind_rows()
+group_by(authors, country) %>% summarise(n=n()) %>% arrange(desc(n)) %>% head(100)
+```
+
+
+
+```{r}
 abstracts <- a
-traits <- b1 %>%
+traits <- traits %>%
     mutate(category = tolower(category), permitted_category = category %in% permitted_categories)
 str(traits)
 str(abstracts)
+meth1
+meth2
+nulls
 
-save(traits, abstracts, file=here("data", "results.RData"))
+
+save(traits, abstracts, authors, nulls, meth1, meth2, file=here("data", "results.RData"))
 ```
 

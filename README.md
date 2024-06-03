@@ -108,3 +108,46 @@ An example output looks like:
 For every abstract in `data/pubmed.json`, the script will generate a summary and save it in `data/pubmed-abstracts.json`.
 
 
+
+## Update
+
+New prompt to attempt to parse methods used:
+
+> What are the exposures and outcomes in this abstract? If there are multiple exposures or outcomes, provide them all. If there are no exposures or outcomes, provide an empty list. Also categorize the exposures and outcomes into the following groups using the exact category names provided: 
+> - molecular
+> - socioeconomic
+> - environmental
+> - behavioural
+> - anthropometric
+> - clinical measures
+> - infectious disease
+> - neoplasm
+> - disease of the blood and blood-forming organs
+> - metabolic disease
+> - mental disorder
+> - disease of the nervous system
+> - disease of the eye and adnexa
+> - disease of the ear and mastoid process
+> - disease of the circulatory system
+> - disease of the digestive system
+> - disease of the skin and subcutaneous tissue
+> - disease of the musculoskeletal system and connective tissue
+> - disease of the genitourinary system
+> If an exposure or outcome does not fit into any of these groups, specify "Other". 
+> List the analytical methods used in the abstract. Match the methods to the following list of exact method names. If a method is used that is not in the list, specify "Other" and also provide the name of the method. The list of methods is as follows:
+> - two-sample mendelian randomization
+> - multivariable mendelian randomization
+> - colocalization
+> - network mendelian randomization
+> - triangulation
+> - reverse mendelian randomization
+> - one-sample mendelian randomization
+> - negative controls
+> - sensitivity analysis
+> - non-linear mendelian randomization
+> - within-family mendelian randomization
+> Summarise how many null vs non-null results were found in the abstract.
+> Provide your answer in strict json format using exactly the format as the example output and without markdown code blocks.
+
+
+Note that it needs improvement, doesn't work particularly well at sticking to listed methods.
