@@ -10,6 +10,8 @@ library(dplyr)
 library(jsonlite)
 library(lubridate)
 library(ggplot2)
+library(forcats)
+library(ggrepel)
 ```
 
 ```{r}
@@ -166,7 +168,7 @@ permitted_methods <- c(
 
 meth$methods <- tolower(meth$methods)
 meth1 <- subset(meth, methods %in% permitted_methods)
-table(tolower(meth1$methods)
+table(tolower(meth1$methods))
 meth2 <- subset(meth, !methods %in% permitted_methods)
 sum(grepl("^mendelian randomization$", meth2$methods), ignore.case=TRUE)
 sum(grepl("^mendelian randomisation$", meth2$methods), ignore.case=TRUE)
@@ -265,4 +267,234 @@ nulls
 
 save(traits, abstracts, authors, nulls, meth1, meth2, file=here("data", "results.RData"))
 ```
+
+
+##
+
+```{r}
+load(here("data", "results.RData"))
+```
+
+
+```{r}
+head(meth1)
+head(traits)
+temp <- inner_join(traits, abstracts, by="pmid") %>%
+    filter(permitted_category & !duplicated(paste(pmid, category))) %>%
+    group_by(category, year=year(pub_date)) %>%
+    summarise(n=n()) %>%
+    group_by(year) %>%
+    mutate(prop=n/sum(n))
+
+p <- temp %>%
+ggplot(., aes(x=year, y=prop, colour=category)) + geom_line() + theme(legend.position="bottom") + xlim(2005,2024)
+
+#ggplotly(p)
+```
+
+
+```{r}
+temp <- inner_join(meth1, abstracts, by="pmid") %>%
+    filter(!duplicated(paste(pmid, methods))) %>%
+    group_by(methods, year=year(pub_date)) %>%
+    summarise(n=n()) %>%
+    group_by(year) %>%
+    mutate(prop=n/sum(n))
+
+temp
+p <- temp %>%
+ggplot(., aes(x=year, y=prop, colour=methods)) + geom_line() + theme(legend.position="bottom") + xlim(2005,2024)
+p
+```
+
+
+```{r}
+temp <- read.table(here("data", "predatory_journals.txt"), sep="\t", header=FALSE)
+
+predj <- tibble(
+    journal1 = gsub("\\s*\\([^\\)]+\\)","",as.character(temp$V1)) %>% tolower(),
+    key1=1:length(journal1)
+)
+
+mrj <- subset(abstracts, !duplicated(journal), select=c(journal)) %>% mutate(key2=1:length(journal), journal=gsub("\\s*\\([^\\)]+\\)","",as.character(journal)) %>% tolower())
+
+library(fedmatch)
+
+temp <- merge_plus(data1 = mrj, data2 = predj, by.x="journal", by.y="journal1", match_type="fuzzy", unique_key_1="key2", unique_key_2="key1")
+
+head(temp)
+dim(temp$matches)
+
+
+
+mrj$predatory <- mrj$journal %in% temp$matches$journal
+table(mrj$predatory)
+abstracts$journal <- gsub("\\s*\\([^\\)]+\\)","",as.character(abstracts$journal)) %>% tolower()
+abstracts$predatory <- abstracts$journal %in% temp$matches$journal
+
+group_by(abstracts, year=year(pub_date)) %>%
+    summarise(n=n(), npred=sum(predatory)) %>%
+    mutate(prop=npred/n, sem = sqrt(npred * (n-npred)/n^3), lci = pmax(0, prop - (1.96 * sem)), uci = pmin(prop + (1.96 * sem), 1)) %>%
+    ggplot(., aes(x=year, y=prop, ymin=lci, ymax=uci)) + geom_line() + geom_ribbon(alpha=0.2) + theme(legend.position="bottom") + xlim(2005,2024) +
+    geom_text(aes(label=npred), vjust=-1) +
+    scale_x_continuous(breaks=seq(2005,2024,1), limits=c(2005, 2024)) +
+    theme(axis.text.x=element_text(angle=45, hjust=1)) +
+    labs(y="Proportion of papers in predatory journals", x="Year")
+```
+
+
+
+```{r}
+unique(authors$country) %>% cat(sep="\n")
+
+```
+
+
+
+## Countries
+
+```{r}
+library(data.table)
+countries <- fread(here("data", "countries.csv"), header=FALSE)
+authors2 <- left_join(authors, countries, by=c("country"="V1"))
+authors2$country <- authors2$V2
+
+authors2 <- authors2 %>% mutate(country2 = case_when(
+    country == "United Kingdom" ~ "UK",
+    country == "USA" ~ "USA",
+    country == "China" ~ "China",
+    # country == "Sweden" ~ "Sweden",
+    # country == "Germany" ~ "Germany",
+    # country == "Australia" ~ "Australia",
+    # country == "Canada" ~ "Canada",
+    # country == "The Netherlands" ~ "The Netherlands",
+    # country == "Denmark" ~ "Denmark",
+    # country == "South Korea" ~ "South Korea",
+    TRUE ~ "All other countries"
+))
+
+table(authors2$country2)
+
+
+temp <- authors2 %>%
+    filter(!duplicated(pmid)) %>% inner_join(., subset(abstracts, select=c(pmid, pub_date)), by="pmid") %>%
+    group_by(country2, year=year(pub_date)) %>%
+    summarise(n=n()) 
+data_ends <- filter(temp, year == "2023")
+
+temp %>%
+    ggplot(., aes(x=year, y=n, colour=country2)) + 
+    # geom_smooth(se=FALSE) + 
+    geom_line() +
+    geom_point(data=data_ends, aes(x=year, y=n, colour=country2)) +
+    geom_text_repel(
+        aes(label = country2), data = data_ends
+    ) +
+   scale_y_log10() +
+   xlim(2005,2023) +
+   theme(legend.position="none")
+```
+
+
+```{r}
+temp %>%
+    filter(country2 != "China") %>%
+    ggplot(., aes(x=year, y=n, colour=country2)) + 
+    # geom_smooth(se=FALSE) + 
+    geom_line() +
+    geom_point(data=data_ends %>% filter(country2 != "China"), aes(x=year, y=n, colour=country2)) +
+    geom_text_repel(
+        aes(label = country2), data = data_ends%>% filter(country2 != "China")
+    ) +
+   xlim(2005,2023) +
+   theme(legend.position="none")
+
+```
+
+
+## Methods
+
+```{r}
+meth1
+
+group_by(meth1, pmid) %>%
+summarise(n=n()) %>%
+inner_join(., abstracts %>% select(pmid, pub_date), by="pmid") %>%
+mutate(year=year(pub_date)) %>%
+filter(year <= 2024) %>%
+ggplot(., aes(x=year, y=n)) + geom_violin(aes(as.factor(year))) +
+labs(y="Number of methods mentioned in abstract")
+```
+
+
+```{r}
+temp <- meth1 %>%
+inner_join(., abstracts %>% select(pmid, pub_date), by="pmid") %>%
+mutate(year=year(pub_date)) %>%
+group_by(methods, year) %>%
+summarise(n=n()) 
+
+data_ends <- filter(temp, year == 2023)
+
+ggplot(temp, aes(x=year, y=n, colour=methods)) + geom_line() + theme(legend.position="none") + xlim(2005,2023) +
+scale_y_log10() + 
+    geom_text_repel(
+        aes(label = methods), data = data_ends
+    ) +
+    labs(y="Number of papers mentioning method", x="Year")
+```
+
+
+
+## Impact factor
+
+```{r}
+citescore <- read.csv("~/Downloads/CiteScore 2023.csv")
+citescore <- bind_rows(
+    select(citescore, issn=Print.ISSN, CiteScore),
+    select(citescore, issn=E.ISSN, CiteScore)
+) %>% filter(issn != "") %>% filter(!duplicated(issn))
+
+head(citescore)
+
+abstracts$issn <- gsub("-", "", abstracts$journal_issn)
+table(unique(abstracts$issn) %in% citescore$Print.ISSN)
+table(abstracts$issn %in% citescore$E.ISSN | abstracts$issn %in% citescore$Print.ISSN)
+
+abstracts_cs <- inner_join(abstracts, citescore)
+abstracts_cs <- inner_join(abstracts_cs, authors2 %>% select(pmid, country2))
+```
+
+```{r}
+ggplot(abstracts_cs, aes(x=year(pub_date), y=CiteScore)) + geom_jitter() + geom_smooth() + theme(legend.position="none") + xlim(2003,2023)
+```
+
+```{r}
+abstracts_cs %>%
+filter(year(pub_date) <= 2024) %>%
+ggplot(., aes(x=year(pub_date), y=CiteScore)) + geom_boxplot(aes(groups=as.factor(year(pub_date)))) + geom_smooth() + theme(legend.position="none") + geom_smooth(aes(x=year(pub_date))) +
+facet_grid(~country2)
+```
+
+
+```{r}
+abstracts_cs_meth <- inner_join(abstracts_cs, meth1, by="pmid")
+
+temp <- group_by(abstracts_cs_meth, methods) %>%
+    summarise(nmeth=n(), CiteScore=mean(CiteScore))
+
+abstracts_cs_meth %>%
+    ggplot(., aes(x=reorder(methods, CiteScore), y=CiteScore)) + geom_boxplot() + theme(legend.position="none") + coord_flip()
+```
+
+```{r}
+abstracts_cs_meth %>%
+    group_by(pmid) %>%
+        summarise(nmeth=n(), CiteScore=mean(CiteScore)) %>%
+        group_by(nmeth) %>%
+        summarise(CiteScore=mean(CiteScore)) %>%
+    ggplot(., aes(x=nmeth, y=CiteScore)) + geom_point()
+```
+
+
 
