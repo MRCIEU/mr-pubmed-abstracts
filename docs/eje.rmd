@@ -1,0 +1,42 @@
+---
+title: Analysis for MR editorial for EJE
+author: Gibran Hemani
+---
+
+
+```{r}
+library(dplyr)
+library(readxl)
+library(here)
+library(tidyr)
+library(ggplot2)
+library(ggrepel)
+```
+
+
+## EJE submissions
+
+```{r}
+eje <- read_xlsx(here("data", "2015_2024_Submissions.xlsx"), n_max=2) %>% pivot_longer(!Year)
+names(eje) <- c("type", "year", "count")
+eje <- bind_rows(eje, eje %>% group_by(year) %>% summarise(count = count[2]-count[1]) %>% mutate(type="Submissions All other countries"))
+str(eje)
+```
+
+
+```{r}
+eje <- eje %>% filter(year != "2024*", type != "Submissions Total") %>% 
+    mutate(type = gsub("Submissions ", "", type))
+
+eje_e <- subset(eje, year == "2023")
+
+ggplot(eje, aes(x=year, y=count, fill=type, group=type, colour=type)) +
+  geom_line() +
+    geom_point(data=eje_e, aes(x=year, y=count)) +
+    geom_text_repel(
+        aes(label = type), data = eje_e
+    ) +
+  labs(y="Submissions received by EJE annually") +
+  theme(legend.position = "none") +
+  expand_limits(y = 0)
+```
