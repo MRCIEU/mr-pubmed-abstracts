@@ -499,6 +499,21 @@ temp %>%
    theme(legend.position="none")
 ```
 
+```{r}
+authors2
+
+authors2 %>% mutate(hospital = grepl("medical", institution, ignore.case=TRUE) | grepl("hospital", institution, ignore.case=TRUE)) %>%
+  group_by(country4, hospital) %>% count()
+```
+
+
+```{r}
+authors %>% mutate(hospital = grepl("medical", institution, ignore.case=TRUE) | grepl("hospital", institution, ignore.case=TRUE)) %>% filter(hospital, country == "China") %>% group_by(institution) %>% count() %>% arrange(desc(n))
+```
+
+
+
+
 
 ## Exponential growth?
 

@@ -1,0 +1,225 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+##
+
+```{r}
+library(dplyr)
+library(here)
+library(ggplot2)
+library(lubridate)
+library(data.table)
+library(ggrepel)
+load(here("data", "results.RData"))
+```
+
+
+```{r}
+temp <- read.table(here("data", "predatory_journals.txt"), sep="\t", header=FALSE)
+
+predj <- tibble(
+    journal1 = gsub("\\s*\\([^\\)]+\\)","",as.character(temp$V1)) %>% tolower(),
+    key1=1:length(journal1)
+)
+
+mrj <- subset(abstracts, !duplicated(journal), select=c(journal)) %>% mutate(key2=1:length(journal), journal=gsub("\\s*\\([^\\)]+\\)","",as.character(journal)) %>% tolower())
+
+library(fedmatch)
+
+temp <- merge_plus(data1 = mrj, data2 = predj, by.x="journal", by.y="journal1", match_type="fuzzy", unique_key_1="key2", unique_key_2="key1")
+
+head(temp)
+dim(temp$matches)
+
+
+
+mrj$predatory <- mrj$journal %in% temp$matches$journal
+table(mrj$predatory)
+abstracts$journal <- gsub("\\s*\\([^\\)]+\\)","",as.character(abstracts$journal)) %>% tolower()
+abstracts$predatory <- abstracts$journal %in% temp$matches$journal
+
+group_by(abstracts, year=year(pub_date)) %>%
+    summarise(n=n(), npred=sum(predatory)) %>%
+    mutate(prop=npred/n, sem = sqrt(npred * (n-npred)/n^3), lci = pmax(0, prop - (1.96 * sem)), uci = pmin(prop + (1.96 * sem), 1)) %>%
+    ggplot(., aes(x=year, y=prop, ymin=lci, ymax=uci)) + geom_line() + geom_ribbon(alpha=0.2) + theme(legend.position="bottom") + xlim(2005,2024) +
+    geom_text(aes(label=npred), vjust=-1) +
+    scale_x_continuous(breaks=seq(2005,2024,1), limits=c(2005, 2024)) +
+    theme(axis.text.x=element_text(angle=45, hjust=1)) +
+    labs(y="Proportion of papers in predatory journals", x="Year")
+```
+
+
+## Countries
+
+```{r}
+countries <- fread(here("data", "countries.csv"), header=FALSE)
+authors2 <- left_join(authors, countries, by=c("country"="V1"))
+authors2$country <- authors2$V2
+
+authors2 <- authors2 %>% mutate(country2 = case_when(
+    country == "United Kingdom" ~ "UK",
+    country == "USA" ~ "USA",
+    country == "China" ~ "China",
+    # country == "Sweden" ~ "Sweden",
+    # country == "Germany" ~ "Germany",
+    # country == "Australia" ~ "Australia",
+    # country == "Canada" ~ "Canada",
+    # country == "The Netherlands" ~ "The Netherlands",
+    # country == "Denmark" ~ "Denmark",
+    # country == "South Korea" ~ "South Korea",
+    TRUE ~ "All other countries"
+))
+
+table(authors2$country2)
+
+
+temp <- authors2 %>%
+    filter(!duplicated(pmid)) %>% inner_join(., subset(abstracts, select=c(pmid, pub_date)), by="pmid") %>%
+    group_by(country2, year=year(pub_date)) %>%
+    summarise(n=n()) 
+data_ends <- filter(temp, year == "2023")
+
+temp %>%
+    ggplot(., aes(x=year, y=n, colour=country2)) + 
+    # geom_smooth(se=FALSE) + 
+    geom_line() +
+    geom_point(data=data_ends, aes(x=year, y=n, colour=country2)) +
+    geom_text_repel(
+        aes(label = country2), data = data_ends
+    ) +
+   scale_y_log10() +
+   xlim(2005,2023) +
+   theme(legend.position="none")
+```
+
+Plot understanding exponential growth
+
+```{r}
+temp %>%
+    ggplot(., aes(x=year, y=n, colour=country2)) + 
+    # geom_smooth(se=FALSE) + 
+    geom_line() +
+    geom_point(data=data_ends, aes(x=year, y=n, colour=country2)) +
+    geom_text_repel(
+        aes(label = country2), data = data_ends
+    ) +
+   xlim(2005,2023) +
+   theme(legend.position="none")
+```
+
+## China universities
+
+```{r}
+c211 <- readLines(here("data", "211_universities.txt"))
+table(c211 %in% authors2$institution)
+
+inst <- subset(authors2, !duplicated(institution), institution) %>% mutate(key1=1:n())
+c211 <- tibble(c211=c211, key2=1:length(c211))
+
+c985 <- readLines(here("data", "985_universities.txt"))
+table(c985 %in% authors2$institution)
+
+c985 <- tibble(c985=c985, key2=1:length(c985))
+
+ctemp_211 <- merge_plus(data1 = inst, data2 = c211, by.x="institution", by.y="c211", match_type="fuzzy", unique_key_1="key1", unique_key_2="key2")
+authors2$c211 <- authors2$institution %in% ctemp_211$matches$institution
+
+ctemp_985 <- merge_plus(data1 = inst, data2 = c985, by.x="institution", by.y="c985", match_type="fuzzy", unique_key_1="key1", unique_key_2="key2")
+authors2$c985 <- authors2$institution %in% ctemp_985$matches$institution
+table(authors2$country == "China", authors2$c211)
+table(authors2$country == "China", authors2$c985)
+```
+
+```{r}
+authors2$country3 <- authors2$country2
+authors2$country3[authors2$country3 == "China" & !authors2$c211] <- "China (other)"
+authors2$country3[authors2$country3 == "China" & authors2$c211] <- "China (211)"
+
+authors2$country4 <- authors2$country2
+authors2$country4[authors2$country4 == "China" & !authors2$c985] <- "China (other)"
+authors2$country4[authors2$country4 == "China" & authors2$c985] <- "China (985)"
+
+table(authors2$country3)
+table(authors2$country4)
+```
+
+
+```{r}
+temp <- authors2 %>%
+    filter(!duplicated(pmid)) %>% inner_join(., subset(abstracts, select=c(pmid, pub_date)), by="pmid") %>%
+    group_by(country3, year=year(pub_date)) %>%
+    summarise(n=n()) 
+data_ends <- filter(temp, year == "2023")
+
+temp %>%
+    ggplot(., aes(x=year, y=n, colour=country3)) + 
+    # geom_smooth(se=FALSE) + 
+    geom_line() +
+    geom_point(data=data_ends, aes(x=year, y=n, colour=country3)) +
+    geom_text_repel(
+        aes(label = country3), data = data_ends
+    ) +
+   xlim(2005,2023) +
+   theme(legend.position="none")
+```
+
+
+```{r}
+temp <- authors2 %>%
+    filter(!duplicated(pmid)) %>% inner_join(., subset(abstracts, select=c(pmid, pub_date)), by="pmid") %>%
+    group_by(country4, year=year(pub_date)) %>%
+    summarise(n=n()) 
+data_ends <- filter(temp, year == "2023")
+
+temp %>%
+    ggplot(., aes(x=year, y=n, colour=country4)) + 
+    # geom_smooth(se=FALSE) + 
+    geom_line() +
+    geom_point(data=data_ends, aes(x=year, y=n, colour=country4)) +
+    geom_text_repel(
+        aes(label = country4), data = data_ends
+    ) +
+   xlim(2005,2023) +
+   theme(legend.position="none")
+```
+
+## Understanding the growth in China
+
+Count abstracts based on whether the affiliation is a hospital based university
+
+```{r}
+authors2 %>% mutate(hospital = grepl("medical", institution, ignore.case=TRUE) | grepl("hospital", institution, ignore.case=TRUE)) %>%
+  group_by(country4, hospital) %>% count()
+```
+
+Which medical universities have the most abstracts?
+
+```{r}
+authors %>% mutate(hospital = grepl("medical", institution, ignore.case=TRUE) | grepl("hospital", institution, ignore.case=TRUE)) %>% filter(hospital, country == "China") %>% group_by(institution) %>% count() %>% arrange(desc(n))
+```
+
+```{r}
+authors2$country5 <- authors2$country2
+authors2 <- authors2 %>% mutate(hospital = grepl("medical", institution, ignore.case=TRUE) | grepl("hospital", institution, ignore.case=TRUE))
+authors2$country5[authors2$country2 == "China" & authors2$hospital] <- "China (medical)"
+
+temp <- authors2 %>%
+    filter(!duplicated(pmid)) %>% inner_join(., subset(abstracts, select=c(pmid, pub_date)), by="pmid") %>%
+    group_by(country5, year=year(pub_date)) %>%
+    summarise(n=n()) 
+data_ends <- filter(temp, year == "2023")
+
+temp %>%
+    ggplot(., aes(x=year, y=n, colour=country5)) + 
+    # geom_smooth(se=FALSE) + 
+    geom_line() +
+    geom_point(data=data_ends, aes(x=year, y=n, colour=country5)) +
+    geom_text_repel(
+        aes(label = country5), data = data_ends
+    ) +
+   xlim(2005,2023) +
+   theme(legend.position="none")
+```
+
