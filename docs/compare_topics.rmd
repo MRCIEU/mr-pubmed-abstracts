@@ -1,0 +1,130 @@
+---
+title: "MR PubMed searches compared against other topics"
+author: "Gibran Hemani"
+date: "2024-11-18"
+---
+
+## Background
+
+We have observed rapid growth in the number of MR publications. Can we normalise this by a) comparing against other topics, and b) comparing against the number of publications in PubMed in general?
+
+
+## Read in data
+
+```{r setup}
+library(readxl)
+library(dplyr)
+library(purrr)
+library(ggplot2)
+library(tidyr)
+library(knitr)
+
+read_data <- function(ind, search) {
+    a <- read.csv(file.path("~", "Downloads", paste0("PubMed_Timeline_results_by_Year-", ind, ".csv")), skip=1, header=TRUE) %>% mutate(search = search)
+    return(a)
+}
+
+dat <- tibble(ind=3:7, search=c("MR", "GWAS", "Systematic reviews", "Meta-analysis", "Mediation analysis")) %>% pmap(., read_data) %>% bind_rows() %>% as_tibble()
+dat <- subset(dat, ! (search == "Systematic reviews" & Year < 1970))
+dat <- subset(dat, ! (search == "GWAS" & Year < 1999))
+dat <- subset(dat, Year <= 2024)
+dat$Year[dat$Year == 2024] <- 2023 + 11/12
+range01 <- function(x){(x-min(x))/(max(x)-min(x))}
+dat <- group_by(dat, search) %>% filter(Count != 0 & Year <= 2024) %>% mutate(countn = Count / max(Count), time = range01(Year)) %>% ungroup()
+
+```
+
+Initial plot
+
+```{r}
+ggplot(dat, aes(x=Year, y=Count, color=search)) + geom_line() + geom_point() + facet_wrap(~search, scale="free")
+```
+
+The x and y axes have very different scales. Normalise by dividing by the maximum count for each search term.
+
+```{r}
+dat %>%
+ggplot(., aes(x=time, y=countn, color=search)) + geom_line() + geom_point() + scale_colour_brewer(type="qual") + labs(x="Total time", y="Count (normalised)")
+```
+
+MR is clearly growing quite rapidly on this scale. Try just plotting from 2000 onwards:
+
+```{r}
+dat %>%
+    filter(Year >= 2000 & Year <= 2024) %>%
+ggplot(., aes(x=Year, y=countn, color=search)) + geom_line() + geom_point() + scale_colour_brewer(type="qual")
+```
+
+Normalise by the number of publications in PubMed in general.
+
+```{r}
+# From https://esperr.github.io/pubmed-by-year/
+pby <- read.csv("~/Downloads/PubMed by Year.csv", header=TRUE) %>% as_tibble()
+names(pby)[-1] <- unique(dat$search)
+pby <- pby %>% gather(key="search", value="count_ratio", -Year) 
+
+dat <- left_join(dat, pby, by=c("Year", "search"))
+dat <- group_by(dat, search) %>% mutate(count_ratio_norm = count_ratio/max(count_ratio)) %>% ungroup()
+
+dat %>% ggplot(., aes(x=Year, y=count_ratio, color=search)) + geom_line() + geom_point() + scale_colour_brewer(type="qual")
+```
+
+Normalising by number of pubmed publications doesn't actually change the shape that much for these topics. Try normalising by the maximum number of publications for each search term.
+
+```{r}
+dat %>% ggplot(., aes(x=Year, y=count_ratio_norm, color=search)) + geom_line() + geom_point() + scale_colour_brewer(type="qual")
+```
+
+Similar story to before standardising by the number of pubmed publications.
+
+Estimate exponential growth
+
+
+```{r}
+calculate_exp_growth <- function(time, counts) {
+    # Fit exponential model by taking log of counts
+    # N(t) = N0 * e^(rt) becomes log(N(t)) = log(N0) + rt
+    model <- lm(log(counts) ~ time)
+
+    # Extract growth coefficient (r)
+    r <- coef(model)[2]
+
+    # Calculate R-squared to assess fit
+    r_squared <- summary(model)$r.squared
+
+    # Calculate doubling time
+    doubling_time <- log(2)/r
+
+    # Return results
+    return(list(
+        growth_coefficient = r,
+        r_squared = r_squared,
+        doubling_time = doubling_time,
+        initial_value = exp(coef(model)[1])
+    ) %>% as_tibble())
+}
+
+l <- list()
+l[[1]] <- dat %>% filter(Year >= 2000 & Year <= 2024) %>%
+    group_by(search) %>% do({
+        calculate_exp_growth(.$Year, .$countn)
+    }) %>% select(search, doubling_time_2003 = doubling_time)
+
+l[[2]] <- dat %>% filter(Year <= 2024) %>%
+    group_by(search) %>% do({
+        x <- .
+        x <- subset(x, Count != 0)
+        calculate_exp_growth(x$Year, x$count_ratio)
+    }) %>% select(search, doubling_time_all = doubling_time)
+
+l[[3]] <- group_by(dat, search) %>% summarise(total = sum(Count), count_2024 = max(Count), ratio = count_2024 / total)
+
+Reduce(function(x, y) merge(x, y, by="search"), l) %>% arrange(desc(ratio)) %>% knitr::kable()
+```
+
+- `doubling_time_2003`: Doubling time from 2003 to 2024
+- `doubling_time_all`: Doubling time for the entire period of publications for that topic
+- `total`: Total number of publications
+- `ratio`: Ratio of the number of publications in 2024 to the total number of publications
+
+To summarise, MR does have a relatively fast doubling time compared to other similar topics. However it is not an extreme outlier in terms of its rapid growth.

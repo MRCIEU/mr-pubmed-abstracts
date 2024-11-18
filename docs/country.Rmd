@@ -194,6 +194,12 @@ authors2 %>% mutate(hospital = grepl("medical", institution, ignore.case=TRUE) |
   group_by(country4, hospital) %>% count()
 ```
 
+```{r}
+authors2 %>% mutate(hospital = grepl("medical", institution, ignore.case=TRUE) | grepl("hospital", institution, ignore.case=TRUE)) %>%
+  group_by(country2, hospital) %>% count()
+```
+
+
 Which medical universities have the most abstracts?
 
 ```{r}
