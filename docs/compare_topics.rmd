@@ -18,9 +18,10 @@ library(purrr)
 library(ggplot2)
 library(tidyr)
 library(knitr)
+library(here)
 
 read_data <- function(ind, search) {
-    a <- read.csv(file.path("~", "Downloads", paste0("PubMed_Timeline_results_by_Year-", ind, ".csv")), skip=1, header=TRUE) %>% mutate(search = search)
+    a <- read.csv(here("data", "pubmed_counts", paste0("PubMed_Timeline_results_by_Year-", ind, ".csv")), skip=1, header=TRUE) %>% mutate(search = search)
     return(a)
 }
 
@@ -59,7 +60,7 @@ Normalise by the number of publications in PubMed in general.
 
 ```{r}
 # From https://esperr.github.io/pubmed-by-year/
-pby <- read.csv("~/Downloads/PubMed by Year.csv", header=TRUE) %>% as_tibble()
+pby <- read.csv(here("data/pubmed_counts/PubMed by Year.csv"), header=TRUE) %>% as_tibble()
 names(pby)[-1] <- unique(dat$search)
 pby <- pby %>% gather(key="search", value="count_ratio", -Year) 
 
