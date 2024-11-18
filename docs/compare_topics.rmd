@@ -65,7 +65,7 @@ names(pby)[-1] <- unique(dat$search)
 pby <- pby %>% gather(key="search", value="count_ratio", -Year) 
 
 dat <- left_join(dat, pby, by=c("Year", "search"))
-dat <- group_by(dat, search) %>% mutate(count_ratio_norm = count_ratio/max(count_ratio)) %>% ungroup()
+dat <- group_by(dat, search) %>% mutate(count_ratio_norm = count_ratio/max(count_ratio, na.rm=T)) %>% ungroup()
 
 dat %>% ggplot(., aes(x=Year, y=count_ratio, color=search)) + geom_line() + geom_point() + scale_colour_brewer(type="qual")
 ```
@@ -73,6 +73,7 @@ dat %>% ggplot(., aes(x=Year, y=count_ratio, color=search)) + geom_line() + geom
 Normalising by number of pubmed publications doesn't actually change the shape that much for these topics. Try normalising by the maximum number of publications for each search term.
 
 ```{r}
+dat <- group_by(dat, search) %>% mutate(count_ratio_norm = count_ratio / max(count_ratio, na.rm=T)) %>% ungroup()
 dat %>% ggplot(., aes(x=Year, y=count_ratio_norm, color=search)) + geom_line() + geom_point() + scale_colour_brewer(type="qual")
 ```
 
