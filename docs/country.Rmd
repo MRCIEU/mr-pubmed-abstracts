@@ -58,9 +58,12 @@ countries <- fread(here("data", "countries.csv"), header=FALSE)
 authors2 <- left_join(authors, countries, by=c("country"="V1"))
 authors2$country <- authors2$V2
 
+authors2$country[authors2$country == "USA"] <- "United States"
+authors2$country[authors2$country == "The Netherlands"] <- "Netherlands"
+
 authors2 <- authors2 %>% mutate(country2 = case_when(
     country == "United Kingdom" ~ "UK",
-    country == "USA" ~ "USA",
+    country == "United States" ~ "USA",
     country == "China" ~ "China",
     # country == "Sweden" ~ "Sweden",
     # country == "Germany" ~ "Germany",
@@ -74,12 +77,17 @@ authors2 <- authors2 %>% mutate(country2 = case_when(
 
 table(authors2$country2)
 
-
 temp <- authors2 %>%
     filter(!duplicated(pmid)) %>% inner_join(., subset(abstracts, select=c(pmid, pub_date)), by="pmid") %>%
     group_by(country2, year=year(pub_date)) %>%
     summarise(n=n()) 
 data_ends <- filter(temp, year == "2023")
+
+temp_all <- authors2 %>%
+    filter(!duplicated(pmid)) %>% inner_join(., subset(abstracts, select=c(pmid, pub_date)), by="pmid") %>%
+    group_by(country, year=year(pub_date)) %>%
+    summarise(n=n())
+
 
 temp %>%
     ggplot(., aes(x=year, y=n, colour=country2)) + 
@@ -106,8 +114,120 @@ temp %>%
         aes(label = country2), data = data_ends
     ) +
    xlim(2005,2023) +
-   theme(legend.position="none")
+   theme(legend.position="none") +
+   labs(y="Number of papers", x="Year")
+ggsave("country.pdf", width=8, height=4)
 ```
+
+## Paper mills
+
+```{r}
+paper_mill <- tibble(perc=c(0.92, 0.02, 0, 0.06), country2=c("China", "USA", "UK", "All other countries"))
+temp <- left_join(temp, paper_mill, by="country2")
+temp$n_adj <- temp$n * (1 - temp$perc)
+data_ends <- filter(temp, year == "2023")
+temp %>%
+    ggplot(., aes(x=year, y=n_adj, colour=country2)) + 
+    # geom_smooth(se=FALSE) + 
+    geom_line() +
+    geom_point(data=data_ends, aes(x=year, y=n_adj, colour=country2)) +
+    geom_text_repel(
+        aes(label = country2), data = data_ends
+    ) +
+   xlim(2005,2023) +
+   theme(legend.position="none") +
+   labs(y="Relative number of papers adjusted for paper mills", x="Year")
+
+```
+
+Retraction watch paper mill papers
+
+```{r}
+format_date <- function(x) {
+    do.call(rbind, strsplit(x, " "))[,1] %>% gsub("/", "-", .) %>% as.Date(., format="%m-%d-%Y") %>% lubridate::year()
+}
+
+format_country <- function(x) {
+    case_when(grepl("China", x) ~ "China", grepl("United States", x) ~ "USA", grepl("United Kingdom", x) ~ "UK", TRUE ~ "All other countries")
+}
+
+rw <- read.csv("~/Downloads/retraction_watch.csv")
+
+# split the Country column by ";" and duplicate the row for every country
+dim(rw)
+rw <- rw %>% tidyr::separate_rows(Country, sep=";")
+
+table(rw$Country)
+
+pm <- paper_milly <- rw %>% filter(grepl("paper mill", Reason, ignore.case=TRUE)) %>%
+    mutate(year=format_date(OriginalPaperDate), country2 = format_country(Country)) %>%
+    group_by(year, country=Country) %>% summarise(nret=n())
+
+left_join(temp_all, pm) %>%
+    mutate(nret = ifelse(is.na(nret), 0, nret)) %>%
+    filter(year < 2023) %>%
+    ggplot(., aes(x=nret, y=n, colour=year, group=country)) + geom_point() + geom_line(aes(group=country))
+
+left_join(temp_all, pm) %>%
+    mutate(nret = ifelse(is.na(nret), 0, nret)) %>%
+    filter(country == "China" & year < 2023) %>%
+    ggplot(., aes(x=nret, y=n, colour=year)) + geom_point() + geom_line()
+```
+
+
+```{r}
+paper_milly <- rw %>% filter(grepl("paper mill", Reason, ignore.case=TRUE)) %>%
+    mutate(year=format_date(OriginalPaperDate), country2 = format_country(Country)) %>% 
+    group_by(year, country2) %>% summarise(nret=n())
+
+paper_mill_y <- group_by(paper_milly, year) %>% summarise(nret_all=sum(nret))
+paper_milly <- left_join(paper_milly, paper_mill_y, by="year") %>% mutate(percrety=nret/nret_all)
+ggplot(paper_milly, aes(x=year, y=nret, colour=country2)) + geom_line() + geom_point() + theme(legend.position="bottom") + labs(y="Proportion of papers in paper mills", x="Year") + scale_colour_brewer(type="qual") + xlim(2015,2022)
+
+temp <- left_join(temp, paper_milly, by=c("year"="year", "country2"="country2"))
+temp$percrety[is.na(temp$percrety)] <- 0
+
+temp$n_adjy <- temp$n * (1 - temp$percrety)
+data_ends <- filter(temp, year == "2023")
+temp %>%
+    ggplot(., aes(x=year, y=n_adj, colour=country2)) + 
+    # geom_smooth(se=FALSE) + 
+    geom_line() +
+    geom_point(data=data_ends, aes(x=year, y=n_adj, colour=country2)) +
+    geom_text_repel(
+        aes(label = country2), data = data_ends
+    ) +
+   xlim(2005,2023) +
+   theme(legend.position="none", ) +
+   labs(y="Relative number of papers adjusted for paper mills", x="Year")
+
+temp %>%
+    ggplot(., aes(x=year, y=n_adjy, colour=country2)) + 
+    # geom_smooth(se=FALSE) + 
+    geom_line() +
+    geom_point(data=data_ends, aes(x=year, y=n_adjy, colour=country2)) +
+    geom_text_repel(
+        aes(label = country2), data = data_ends
+    ) +
+   xlim(2005,2023) +
+   theme(legend.position="none") +
+   labs(y="Relative number of papers adjusted for paper mills", x="Year")
+```
+
+```{r}
+temp %>%
+    group_by(year) %>%
+    summarise(n=sum(n), n_adjy=sum(n_adjy)) %>%
+    tidyr::pivot_longer(cols=c(n, n_adjy), names_to="type", values_to="value") %>%
+    ggplot(., aes(x=year, y=value)) + 
+    # geom_smooth(se=FALSE) + 
+    geom_line(aes(colour=type)) +
+   xlim(2005,2023) +
+   labs(y="Relative number of papers adjusted for paper mills", x="Year")
+
+```
+
+
 
 ## China universities
 
