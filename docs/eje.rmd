@@ -161,13 +161,64 @@ tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
 
 ```
 
+
+## Add UK and USA
+
+```{r}
+table(a$country)
+a$type2 <- "All other countries"
+a$type2[a$country == "UNITED KINGDOM OF GREAT BRITAIN AND NORTHERN IRELAND"] <- "UK"
+a$type2[a$country == "UNITED STATES OF AMERICA"] <- "USA"
+a$type2[a$country == "CHINA"] <- "China"
+
+a2 <- a %>% group_by(year, type=type2) %>%
+  summarise(count=n())
+all_possible <- expand.grid(year=2015:2024, type=c("China", "UK", "USA", "All other countries"), count=0)
+code <- paste(all_possible$year, all_possible$type)
+all_possible <- subset(all_possible, ! code %in% paste(a2$year, a2$type))
+a2 <- bind_rows(a2, all_possible)
+
+ggplot(a2 %>% filter(year != 2024), aes(x=year, y=count, fill=type, group=type, colour=type)) +
+  geom_line() +
+    # geom_point(data=eje_e2, aes(x=year, y=count)) +
+    # geom_text_repel(
+    #     aes(label = type), data = eje_e2
+    # ) +
+  labs(y="MR Submissions received by EJE annually") +
+  # theme(legend.position = "none") +
+  expand_limits(y = 0) +
+  scale_colour_brewer(type="qual")
+```
+
+
+```{r}
+eje$year <- as.numeric(eje$year)
+eje_all <- full_join(eje, a2, by=c("year", "type"), suffix=c("_all", "_mr"))
+eje_all$count_other <- eje_all$count_all - eje_all$count_mr
+
+tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
+  ggplot(aes(x=year, y=value, group=type, colour=name)) +
+  geom_point() +
+  geom_line(aes(group=paste(type, name), linetype=type)) +
+  labs(y="Submissions received by EJE annually")
+
+tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
+  filter(name != "count_all", year != 2024) %>% 
+  mutate(name = case_when(name == "count_all" ~ "All", name == "count_mr" ~ "MR papers", name == "count_other" ~ "Other papers")) %>%
+  ggplot(aes(x=as.factor(year), y=value, group=type, fill=name)) +
+  geom_bar(aes(fill=name, group=type), stat="identity", position="stack") +
+  facet_grid( ~ type) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  labs(x="Year", y="Submissions received by EJE annually", fill="Submission type")
+```
+
 ## Adjusting for estimated paper mill fraction
 
 Suppose that some fraction of all papers come from paper mills. 
 
 
 
-```{r}
+```{r, eval=FALSE}
 
 paper_mill_fraction <- tibble(
   
@@ -191,7 +242,7 @@ tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
 
 ```{r}
 ni <- lapply(2016:2024, \(y) {
-  a <- read.csv(file.path("~/Downloads", paste0(y, "-research-leading-countries.csv"))) %>% clean_names()
+  a <- read.csv(here("data", "nature_index", paste0(y, "-research-leading-countries.csv"))) %>% clean_names()
   i <- which(names(a) == paste0("share_", y-1))
   names(a)[i] <- "share"
   i <- which(names(a) == paste0("count_", y-1))

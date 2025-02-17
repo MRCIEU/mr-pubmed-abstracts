@@ -1,0 +1,168 @@
+Position,Country/territory,"Share 2015","Count 2015"
+1,"United States of America (USA)",20766.3996127,27561
+2,China,7676.2913917,10691
+3,Germany,4682.2006148,8301
+4,"United Kingdom (UK)",3809.7685285,7349
+5,Japan,3416.761012,5063
+6,France,2440.4545453,4857
+7,Canada,1777.6842984,3268
+8,"South Korea",1419.4597701,2244
+9,Switzerland,1348.5718453,2950
+10,Australia,1211.6515165,2476
+11,Spain,1205.4742734,2642
+12,Italy,1183.3269868,2632
+13,India,943.185465,1410
+14,Netherlands,867.055406,2114
+15,Sweden,661.5904124,1578
+16,Israel,612.8974543,1187
+17,Singapore,590.9485664,1105
+18,Taiwan,499.7118027,987
+19,Belgium,416.5148243,1057
+20,Russia,388.3635774,1151
+21,Denmark,373.4661377,1049
+22,Austria,321.492747,901
+23,Poland,248.4770588,768
+24,Brazil,238.1198209,753
+25,Finland,222.9407391,649
+26,"Czech Republic",161.0165898,573
+27,Norway,152.8898715,564
+28,Portugal,144.42026,497
+29,"New Zealand",129.5744141,352
+30,Ireland,128.0308219,434
+31,"Saudi Arabia",124.364094,547
+32,Greece,104.044578,408
+33,Chile,103.0636896,382
+34,Argentina,97.3230957,314
+35,Hungary,90.3522647,341
+36,Mexico,79.2660687,293
+37,Turkey,76.9494074,357
+38,"South Africa",75.6805402,332
+39,Iran,69.3042186,161
+40,Slovenia,47.3146521,214
+41,Ukraine,32.9446748,205
+42,Thailand,32.7667184,165
+43,Romania,27.4271103,212
+44,Iceland,23.9194005,78
+45,Pakistan,23.3004575,130
+46,Croatia,20.5698325,150
+47,Estonia,18.4238538,128
+48,Colombia,17.1674115,231
+49,Cyprus,16.8194917,74
+50,Serbia,16.1474111,164
+51,"United Arab Emirates",15.7988238,58
+52,Slovakia,13.1031619,137
+53,Bulgaria,10.4676742,84
+54,Egypt,10.3976425,129
+55,Lithuania,9.8284095,68
+56,Vietnam,9.3317535,74
+57,Luxembourg,9.3172664,36
+58,Uruguay,8.9678216,22
+59,Malaysia,8.772239,110
+60,Qatar,7.1190108,69
+61,Armenia,6.9937889,152
+62,Kazakhstan,6.5757276,21
+63,Morocco,6.2983737,91
+64,Panama,5.8888611,33
+65,Indonesia,5.5830404,37
+66,Kenya,5.4726652,36
+67,Peru,5.0206244,48
+68,Latvia,4.9252856,12
+69,Tunisia,4.5137502,22
+70,Belarus,4.4077119,131
+71,Lebanon,4.3021495,29
+72,Philippines,3.9906508,25
+73,Bangladesh,3.7413951,27
+74,Algeria,3.3678724,14
+75,Georgia,2.9779656,124
+76,Venezuela,2.9355504,15
+77,Cuba,2.9328381,21
+78,"Costa Rica",2.9184296,20
+79,Tanzania,2.8400825,16
+80,Monaco,2.5875,8
+81,Kuwait,2.5258479,13
+82,Ecuador,2.5044813,34
+83,Moldova,2.0835257,15
+84,Ethiopia,2.0266536,14
+85,Malta,1.949095,6
+86,"Sri Lanka",1.8959135,27
+87,Senegal,1.7745247,10
+88,Jordan,1.6851236,16
+89,Nepal,1.6365979,7
+90,Mali,1.6334848,8
+91,Bolivia,1.5525281,9
+92,Cambodia,1.3299269,10
+93,"Burkina Faso",1.302877,8
+95,Brunei,1.2044358,9
+96,"French Polynesia",1.2005828,7
+97,Uganda,1.1863382,8
+97,"Democratic Republic of the Congo (DRC)",1.396910101249,10
+98,Zambia,1.1274242,4
+99,Oman,1.0114993,8
+100,Azerbaijan,0.98951,76
+101,Cameroon,0.9718541,12
+102,Greenland,0.9513158,4
+103,Uzbekistan,0.8422222,3
+104,Kyrgyzstan,0.8365152,6
+105,Gabon,0.8189394,4
+106,Iraq,0.7963184,9
+107,Mongolia,0.7941498,13
+108,Nigeria,0.787679,16
+109,"Trinidad and Tobago",0.775817,5
+110,Rwanda,0.6841709,4
+111,Namibia,0.6671958,4
+112,Ghana,0.6392544,10
+113,Gambia,0.6164288,5
+114,Malawi,0.6126547,8
+115,"Bosnia and Herzegovina",0.6107431,8
+116,"Sierra Leone",0.5836964,6
+117,Botswana,0.5650794,4
+118,"Ivory Coast",0.5214053,3
+119,Paraguay,0.5,1
+119,Liechtenstein,0.5,1
+120,Syria,0.3859649,3
+121,Albania,0.3433333,2
+122,Mauritius,0.3364979,2
+123,Niger,0.3214286,2
+124,"Palestinian territories",0.3142045,4
+125,Laos,0.2961712,6
+126,Bahamas,0.2857143,1
+127,Guatemala,0.2713675,3
+128,"North Korea",0.2608696,2
+129,"Faroe Islands",0.2588235,2
+130,Reunion,0.2381134,3
+131,Guinea,0.229798,2
+132,Bahrain,0.2222222,1
+133,Jamaica,0.1771566,4
+134,Vanuatu,0.175,2
+135,"Saint Kitts and Nevis",0.1694034,3
+136,Macedonia,0.1561937,3
+137,Congo,0.25,1
+137,"Papua New Guinea",0.153563,4
+138,"Solomon Islands",0.1481481,2
+139,Angola,0.1428571,1
+140,Myanmar,0.1376284,4
+141,"Vatican City State (Holy See)",0.1259259,3
+142,Swaziland,0.1,1
+142,Tajikistan,0.1,1
+143,Grenada,0.0909091,1
+143,Liberia,0.0909091,1
+144,"Central African Republic",0.0625,1
+145,Montenegro,0.056665,5
+146,Zimbabwe,0.0555556,1
+147,Fiji,0.0540541,1
+148,Libya,0.0434783,1
+149,Guyana,0.0274028,3
+150,Samoa,0.027027,1
+151,Madagascar,0.0115607,1
+152,Seychelles,0.0033683,2
+153,Chad,0,0
+153,Benin,0,0
+153,Sudan,0,0
+153,Djibouti,0,0
+153,Honduras,0,0
+153,Maldives,0,0
+153,Suriname,0,0
+153,Nicaragua,0,0
+153,"Cape Verde",0,0
+153,"East Timor",0,0
+153,Guinea-Bissau,0,0
