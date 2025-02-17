@@ -349,3 +349,23 @@ temp %>%
    theme(legend.position="none")
 ```
 
+
+## Diversity
+
+```{r}
+dates <- subset(abstracts, select=c(pmid, pub_date))
+authors2 <- left_join(authors2, dates, by="pmid")
+authors2$year <- year(authors2$pub_date)
+authors2$month <- month(authors2$pub_date)
+
+# Get the cumulative number of countries per year
+lapply(unique(authors2$year), function(x) {
+    temp <- authors2 %>% filter(year <= x)
+    ncountry <- n_distinct(temp$V2)
+    tibble(year=x, ncountry=ncountry)
+}) %>% bind_rows() %>%
+ggplot(., aes(x=year, y=ncountry)) + geom_line() + geom_point() + labs(y="Number of countries", x="Year")
+
+
+```
+
