@@ -12,6 +12,9 @@ library(lubridate)
 library(ggplot2)
 library(forcats)
 library(ggrepel)
+library(fedmatch)
+require(MASS)
+library(data.table)
 ```
 
 ```{r}
@@ -213,7 +216,7 @@ ggplot(., aes(x=reorder(category, n), y=n, fill=what)) + geom_bar(stat="identity
 ```{r}
 nonecount <- group_by(traits, pmid) %>%
     summarise(NONE = sum(trait == "NONE")) %>%
-    inner_join(., a %>% select(pmid, pub_date), by="pmid")
+    inner_join(., a %>% dplyr::select(pmid, pub_date), by="pmid")
 table(nonecount$NONE)
 ```
 
@@ -276,7 +279,7 @@ temp <- inner_join(traits, abstracts, by="pmid") %>%
 
 p <- temp %>%
 ggplot(., aes(x=year, y=prop, colour=category)) + geom_line() + theme(legend.position="bottom") + xlim(2005,2024)
-
+p
 #ggplotly(p)
 ```
 
@@ -306,7 +309,6 @@ predj <- tibble(
 
 mrj <- subset(abstracts, !duplicated(journal), select=c(journal)) %>% mutate(key2=1:length(journal), journal=gsub("\\s*\\([^\\)]+\\)","",as.character(journal)) %>% tolower())
 
-library(fedmatch)
 
 temp <- merge_plus(data1 = mrj, data2 = predj, by.x="journal", by.y="journal1", match_type="fuzzy", unique_key_1="key2", unique_key_2="key1")
 
@@ -342,7 +344,6 @@ unique(authors$country) %>% cat(sep="\n")
 ## Countries
 
 ```{r}
-library(data.table)
 countries <- fread(here("data", "countries.csv"), header=FALSE)
 authors2 <- left_join(authors, countries, by=c("country"="V1"))
 authors2$country <- authors2$V2
@@ -368,7 +369,7 @@ temp <- authors2 %>%
     filter(!duplicated(pmid)) %>% inner_join(., subset(abstracts, select=c(pmid, pub_date)), by="pmid") %>%
     group_by(country2, year=year(pub_date)) %>%
     summarise(n=n()) 
-data_ends <- filter(temp, year == "2023")
+data_ends <- filter(temp, year == "2024")
 
 temp %>%
     ggplot(., aes(x=year, y=n, colour=country2)) + 
@@ -379,7 +380,7 @@ temp %>%
         aes(label = country2), data = data_ends
     ) +
    scale_y_log10() +
-   xlim(2005,2023) +
+   xlim(2005,2024) +
    theme(legend.position="none")
 ```
 
@@ -394,7 +395,7 @@ temp %>%
     geom_text_repel(
         aes(label = country2), data = data_ends
     ) +
-   xlim(2005,2023) +
+   xlim(2005,2024) +
    theme(legend.position="none")
 ```
 
@@ -408,7 +409,7 @@ temp %>%
     geom_text_repel(
         aes(label = country2), data = data_ends%>% filter(country2 != "China")
     ) +
-   xlim(2005,2023) +
+   xlim(2005,2024) +
    theme(legend.position="none")
 
 ```
@@ -453,7 +454,7 @@ temp <- authors2 %>%
     filter(!duplicated(pmid)) %>% inner_join(., subset(abstracts, select=c(pmid, pub_date)), by="pmid") %>%
     group_by(country3, year=year(pub_date)) %>%
     summarise(n=n()) 
-data_ends <- filter(temp, year == "2023")
+data_ends <- filter(temp, year == "2024")
 
 temp %>%
     ggplot(., aes(x=year, y=n, colour=country3)) + 
@@ -463,7 +464,7 @@ temp %>%
     geom_text_repel(
         aes(label = country3), data = data_ends
     ) +
-   xlim(2005,2023) +
+   xlim(2005,2024) +
    theme(legend.position="none")
 ```
 
@@ -473,7 +474,7 @@ temp <- authors2 %>%
     filter(!duplicated(pmid)) %>% inner_join(., subset(abstracts, select=c(pmid, pub_date)), by="pmid") %>%
     group_by(country4, year=year(pub_date)) %>%
     summarise(n=n()) 
-data_ends <- filter(temp, year == "2023")
+data_ends <- filter(temp, year == "2024")
 
 temp %>%
     ggplot(., aes(x=year, y=n, colour=country4)) + 
@@ -483,7 +484,7 @@ temp %>%
     geom_text_repel(
         aes(label = country4), data = data_ends
     ) +
-   xlim(2005,2023) +
+   xlim(2005,2024) +
    theme(legend.position="none")
 ```
 
@@ -499,75 +500,6 @@ authors2 %>% mutate(hospital = grepl("medical", institution, ignore.case=TRUE) |
 authors %>% mutate(hospital = grepl("medical", institution, ignore.case=TRUE) | grepl("hospital", institution, ignore.case=TRUE)) %>% filter(hospital, country == "China") %>% group_by(institution) %>% count() %>% arrange(desc(n))
 ```
 
-
-
-
-
-## Exponential growth?
-
-```{r}
-ex <- rexp(10000, rate = 1.85) # generate some exponential distribution
-control <- abs(rnorm(10000)) # generate some other distribution
-
-# estimate the parameters
-fit1 <- fitdistr(ex, "exponential") 
-fit2 <- fitdistr(control, "exponential")
-
-# goodness of fit test
-ks.test(ex, "pexp", fit1$estimate) # p-value > 0.05 -> distribution not refused
-ks.test(control, "pexp", fit2$estimate) #  significant p-value -> distribution refused
-
-# plot a graph
-hist(ex, freq = FALSE, breaks = 100, xlim = c(0, quantile(ex, 0.99)))
-x <- ex
-curve(dexp(x, rate = fit1$estimate), from = 0, col = "red", add = TRUE)
-
-require(MASS)
-
-
-temp <- authors2 %>%
-    filter(!duplicated(pmid)) %>% inner_join(., subset(abstracts, select=c(pmid, pub_date)), by="pmid")
-
-a <- as.period(ymd(temp$pub_date) - ymd("2003-01-01")) / months(1)
-hist(a)
-
-
-fit1 <- fitdistr(a, "exponential")
-o <- ks.test(a, "pexp", fit1$estimate)
-o$p.value
-
-plot(temp$)
-
-
-
-
-
-lapply(unique(authors2$country3), function(x) {
-    te <- subset(temp, country3 == x)
-    a <- as.period(te$pub_date - min(te$pub_date)) / months(1)
-    fit1 <- fitdistr(a, "exponential")
-    o <- ks.test(a, "pexp", fit1$estimate)
-    tibble(country=x, p=o$p.value, D=o$statistic)
-}) %>% bind_rows()
-
-
-a <- as.period(ymd(temp$pub_date) - ymd("2003-01-01")) / months(1)
-hist(a)
-
-fit1 <- fitdistr(a, "exponential")
-ks.test(a, "pexp", fit1$estimate)
-
-plot(dexp())
-
-hist(a, breaks=100)
-curve(dexp(x, rate = fit1$estimate), from = 0, col = "red", add = TRUE)
-
-
-
-```
-
-
-
 ## Methods
 
 ```{r}
@@ -575,7 +507,7 @@ meth1
 
 group_by(meth1, pmid) %>%
 summarise(n=n()) %>%
-inner_join(., abstracts %>% select(pmid, pub_date), by="pmid") %>%
+inner_join(., abstracts %>% dplyr::select(pmid, pub_date), by="pmid") %>%
 mutate(year=year(pub_date)) %>%
 filter(year <= 2024) %>%
 ggplot(., aes(x=year, y=n)) + geom_violin(aes(as.factor(year))) +
@@ -585,7 +517,7 @@ labs(y="Number of methods mentioned in abstract")
 
 ```{r}
 temp <- meth1 %>%
-inner_join(., abstracts %>% select(pmid, pub_date), by="pmid") %>%
+inner_join(., abstracts %>% dplyr::select(pmid, pub_date), by="pmid") %>%
 mutate(year=year(pub_date)) %>%
 group_by(methods, year) %>%
 summarise(n=n()) 
@@ -593,7 +525,7 @@ summarise(n=n())
 data_ends <- filter(temp, year == 2023)
 
 ggplot(temp, aes(x=year, y=n, colour=methods)) + geom_line() + theme(legend.position="none") + xlim(2005,2023) +
-scale_y_log10() + 
+    scale_y_log10() + 
     geom_text_repel(
         aes(label = methods), data = data_ends
     ) +
@@ -607,8 +539,8 @@ scale_y_log10() +
 ```{r}
 citescore <- read.csv("~/Downloads/CiteScore 2023.csv")
 citescore <- bind_rows(
-    select(citescore, issn=Print.ISSN, CiteScore),
-    select(citescore, issn=E.ISSN, CiteScore)
+    dplyr::select(citescore, issn=Print.ISSN, CiteScore),
+    dplyr::select(citescore, issn=E.ISSN, CiteScore)
 ) %>% filter(issn != "") %>% filter(!duplicated(issn))
 
 head(citescore)
@@ -618,11 +550,11 @@ table(unique(abstracts$issn) %in% citescore$Print.ISSN)
 table(abstracts$issn %in% citescore$E.ISSN | abstracts$issn %in% citescore$Print.ISSN)
 
 abstracts_cs <- inner_join(abstracts, citescore)
-abstracts_cs <- inner_join(abstracts_cs, authors2 %>% select(pmid, country2))
+abstracts_cs <- inner_join(abstracts_cs, authors2 %>% dplyr::select(pmid, country2))
 ```
 
 ```{r}
-ggplot(abstracts_cs, aes(x=year(pub_date), y=CiteScore)) + geom_jitter() + geom_smooth() + theme(legend.position="none") + xlim(2003,2023)
+ggplot(abstracts_cs, aes(x=year(pub_date), y=CiteScore)) + geom_jitter() + geom_smooth() + theme(legend.position="none") + xlim(2003,2025)
 ```
 
 ```{r}
