@@ -15,7 +15,7 @@ library(ggrepel)
 ```
 
 ```{r}
-a <- jsonlite::read_json(here("data", "pubmed.json")) %>%
+a <- jsonlite::read_json(here("data", "pubmed_abstracts_20250519.json")) %>%
     lapply(., function(x) {
         x <- as_tibble(x)
         x
@@ -26,18 +26,6 @@ a <- jsonlite::read_json(here("data", "pubmed.json")) %>%
         week=ceiling_date(pub_date, "weeks"),
     )
 
-a1 <- jsonlite::read_json(here("data", "pubmed_new.json")) %>%
-    lapply(., function(x) {
-        x <- as_tibble(x)
-        x
-    }) %>% 
-    bind_rows() %>%
-    mutate(
-        pub_date=ymd(pub_date),
-        week=ceiling_date(pub_date, "weeks"),
-    )
-
-a <- bind_rows(a, a1)
 dim(a)
 length(unique(a$pmid))
 ```
@@ -122,7 +110,7 @@ parse_res <- function(x) {
     return(list(o=o, m=m, r=r))
 }
 
-b <- jsonlite::read_json(here("data", "pubmed_abstracts3.json")) 
+b <- jsonlite::read_json(here("data", "pubmed_abstracts_processed_20250502.json")) 
 b1 <- b %>%
 {
     lapply(., function(x) {
@@ -244,7 +232,7 @@ write.table(missing_pmids, here("data", "missing_pmids.txt"), row.names=FALSE, c
 
 
 ```{r}
-authors <- jsonlite::read_json(here("data", "pubmed_authors.json")) %>%
+authors <- jsonlite::read_json(here("data", "pubmed_authors_20250502.json")) %>%
     lapply(., \(x) {
         tibble(pmid=x$pmid, country=unlist(x$country), institution=unlist(x$institution))
     }) %>%
