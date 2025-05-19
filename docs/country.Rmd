@@ -81,7 +81,7 @@ temp <- authors2 %>%
     filter(!duplicated(pmid)) %>% inner_join(., subset(abstracts, select=c(pmid, pub_date)), by="pmid") %>%
     group_by(country2, year=year(pub_date)) %>%
     summarise(n=n()) 
-data_ends <- filter(temp, year == "2023")
+data_ends <- filter(temp, year == "2024")
 
 temp_all <- authors2 %>%
     filter(!duplicated(pmid)) %>% inner_join(., subset(abstracts, select=c(pmid, pub_date)), by="pmid") %>%
@@ -98,7 +98,7 @@ temp %>%
         aes(label = country2), data = data_ends
     ) +
    scale_y_log10() +
-   xlim(2005,2023) +
+   xlim(2005,2024) +
    theme(legend.position="none")
 ```
 
@@ -113,7 +113,7 @@ temp %>%
     geom_text_repel(
         aes(label = country2), data = data_ends
     ) +
-   xlim(2005,2023) +
+   xlim(2005,2024) +
    theme(legend.position="none") +
    labs(y="Number of papers", x="Year")
 ggsave("country.pdf", width=8, height=4)
@@ -125,7 +125,7 @@ ggsave("country.pdf", width=8, height=4)
 paper_mill <- tibble(perc=c(0.92, 0.02, 0, 0.06), country2=c("China", "USA", "UK", "All other countries"))
 temp <- left_join(temp, paper_mill, by="country2")
 temp$n_adj <- temp$n * (1 - temp$perc)
-data_ends <- filter(temp, year == "2023")
+data_ends <- filter(temp, year == "2024")
 temp %>%
     ggplot(., aes(x=year, y=n_adj, colour=country2)) + 
     # geom_smooth(se=FALSE) + 
@@ -134,7 +134,7 @@ temp %>%
     geom_text_repel(
         aes(label = country2), data = data_ends
     ) +
-   xlim(2005,2023) +
+   xlim(2005,2024) +
    theme(legend.position="none") +
    labs(y="Relative number of papers adjusted for paper mills", x="Year")
 
@@ -367,5 +367,89 @@ lapply(unique(authors2$year), function(x) {
 ggplot(., aes(x=year, y=ncountry)) + geom_line() + geom_point() + labs(y="Number of countries", x="Year")
 
 
+```
+
+
+## Manual check of the data
+
+Something is wrong with the current ChatGPT mapping. Do a manual annotation of country affiliations.
+
+```{r}
+orig_abstracts <- jsonlite::read_json(here("data/pubmed_abstracts_20250519.json"))
+orig_abstracts <- lapply(orig_abstracts, function(x) {
+    as_tibble(x)
+}) %>% bind_rows()
+
+orig_abstracts$ymd <- lubridate::ymd(orig_abstracts$pub_date)
+orig_abstracts$year <- year(orig_abstracts$ymd)
+table(orig_abstracts$year)
+
+table(orig_abstracts$year, is.na(orig_abstracts$ab))
+table(orig_abstracts$year, is.na(orig_abstracts$author_affil))
+```
+
+
+```{r}
+author_results <- jsonlite::read_json(here("data/pubmed_authors_20250502.json"), flatten=TRUE)
+temp <- author_results[[4213]] %>% as_tibble()
+temp$institution <- unlist(temp$institution)
+author_results <- lapply(author_results, function(x) {
+    x <- as_tibble(x)
+    x$institution <- unlist(x$institution)
+    x$country <- unlist(x$country)
+    x
+}) %>% bind_rows()
+
+author_results
+
+orig_abstracts
+
+table(orig_abstracts$pmid %in% author_results$pmid)
+table(orig_abstracts$year, orig_abstracts$pmid %in% author_results$pmid)
+table(author_results$pmid %in% orig_abstracts$pmid)
+```
+
+```{r}
+china <- grepl("China", orig_abstracts$author_affil, ignore.case=TRUE)
+usa <- grepl("usa", orig_abstracts$author_affil, ignore.case=TRUE) |
+    grepl("united states", orig_abstracts$author_affil, ignore.case=TRUE) |
+    grepl("united states of america", orig_abstracts$author_affil, ignore.case=TRUE)
+uk <- grepl("united kingdom", orig_abstracts$author_affil, ignore.case=TRUE) |
+    grepl("UK", orig_abstracts$author_affil, ignore.case=FALSE) |
+    grepl("england", orig_abstracts$author_affil, ignore.case=TRUE) |
+    grepl("scotland", orig_abstracts$author_affil, ignore.case=TRUE) |
+    grepl("wales", orig_abstracts$author_affil, ignore.case=TRUE)
+  
+all_others <- !china & !usa & !uk
+
+sum(china)
+sum(usa)
+sum(uk)
+sum(all_others)
+
+country_pmids <- bind_rows(
+    tibble(country="China", pmid = orig_abstracts$pmid[china]),
+    tibble(country="USA", pmid = orig_abstracts$pmid[usa]),
+    tibble(country="UK", pmid = orig_abstracts$pmid[uk]),
+    tibble(country="All other countries", pmid = orig_abstracts$pmid[all_others])
+) %>% filter(!duplicated(pmid))
+
+orig_abstracts <- left_join(orig_abstracts, country_pmids, by = "pmid")
+orig_abstracts_summary <- orig_abstracts %>%
+    group_by(year, country) %>%
+    summarise(n=n())
+
+data_ends <- filter(orig_abstracts_summary, year == "2024")
+
+orig_abstracts_summary %>%
+    ggplot(., aes(x=year, y=n, colour=country)) + 
+    geom_line() +
+    geom_point() +
+    xlim(2003,2024) +
+    theme(legend.position="none") +
+    geom_text_repel(aes(label = country), data = data_ends) +
+    labs(y="Number of papers", x="Year") +
+    theme(axis.text.x=element_text(angle=45, hjust=1))
+ggsave(here("docs", "fig1a.pdf"), width=5, height=5)
 ```
 
