@@ -400,9 +400,9 @@ author_results <- lapply(author_results, function(x) {
     x
 }) %>% bind_rows()
 
-author_results
+# author_results
 
-orig_abstracts
+# orig_abstracts
 
 table(orig_abstracts$pmid %in% author_results$pmid)
 table(orig_abstracts$year, orig_abstracts$pmid %in% author_results$pmid)
@@ -450,6 +450,6 @@ orig_abstracts_summary %>%
     geom_text_repel(aes(label = country), data = data_ends) +
     labs(y="Number of papers", x="Year") +
     theme(axis.text.x=element_text(angle=45, hjust=1))
-ggsave(here("docs", "fig1a.pdf"), width=5, height=5)
+ggsave(here("docs", "fig1a.pdf"), width=7, height=7)
 ```
 

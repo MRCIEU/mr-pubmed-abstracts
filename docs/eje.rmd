@@ -18,18 +18,18 @@ library(janitor)
 ## EJE submissions
 
 ```{r}
-eje <- read_xlsx(here("data", "2015_2024_Submissions.xlsx"), n_max=2) %>% pivot_longer(!Year)
+eje <- read_xlsx(here("data", "2015_2024_Submissions[80].xlsx"), n_max=5) %>% pivot_longer(!Year)
 names(eje) <- c("type", "year", "count")
-eje <- bind_rows(eje, eje %>% group_by(year) %>% summarise(count = count[2]-count[1]) %>% mutate(type="Submissions All other countries"))
+# eje <- bind_rows(eje, eje %>% group_by(year) %>% summarise(count = count[2]-count[1]) %>% mutate(type="Submissions All other countries"))
 str(eje)
 ```
 
 
 ```{r}
 eje <- eje %>% filter(year != "2024*", type != "Submissions Total") %>% 
-    mutate(type = gsub("Submissions ", "", type))
+    mutate(type = gsub("Submissions ", "", type)) %>% as.data.frame()
 
-eje_e <- subset(eje, year == "2023")
+eje_e <- subset(eje, year == "2024")
 
 ggplot(eje, aes(x=year, y=count, fill=type, group=type, colour=type)) +
   geom_line() +
@@ -46,10 +46,19 @@ ggplot(eje, aes(x=year, y=count, fill=type, group=type, colour=type)) +
 ## EJE MR papers
 
 ```{r}
-a <- read_xlsx("~/Downloads/Mendelian Randomisation Submissions_2015_24.xlsx")
+a <- read_xlsx(here("data/Mendelian Randomisation Submissions_2015_24.xlsx"))
 a <- clean_names(a)
 a$date <- lubridate::mdy(a$initial_date_submitted)
 str(a)
+
+a1 <- read_xlsx(here("data/Mendelian Randomisation Submissions_2024.xlsx"))
+a1 <- clean_names(a1)
+a1$date <- lubridate::mdy(a1$initial_date_submitted)
+str(a1)
+
+a <- bind_rows(a, a1) %>% filter(!duplicated(manuscript_number))
+dim(a)
+
 
 table(a$country)
 a$type <- ifelse(a$country == "CHINA", "China", "All other countries")
@@ -115,12 +124,85 @@ tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
 
 ```
 
-Growth rates
+
+## Add UK and USA
+
+```{r}
+table(a$country)
+a$type2 <- "All other countries"
+a$type2[a$country == "UNITED KINGDOM OF GREAT BRITAIN AND NORTHERN IRELAND"] <- "UK"
+a$type2[a$country == "UNITED STATES OF AMERICA"] <- "USA"
+a$type2[a$country == "CHINA"] <- "China"
+
+a2 <- a %>% group_by(year, type=type2) %>%
+  summarise(count=n())
+all_possible <- expand.grid(year=2015:2024, type=c("China", "UK", "USA", "All other countries"), count=0)
+code <- paste(all_possible$year, all_possible$type)
+all_possible <- subset(all_possible, ! code %in% paste(a2$year, a2$type))
+a2 <- bind_rows(a2, all_possible)
+
+ggplot(a2, aes(x=year, y=count, fill=type, group=type, colour=type)) +
+  geom_line() +
+    # geom_point(data=eje_e2, aes(x=year, y=count)) +
+    # geom_text_repel(
+    #     aes(label = type), data = eje_e2
+    # ) +
+  labs(y="MR Submissions received by EJE annually") +
+  # theme(legend.position = "none") +
+  expand_limits(y = 0) +
+  scale_colour_brewer(type="qual")
+```
+
+
+```{r}
+eje$year <- as.numeric(eje$year)
+eje_all <- full_join(eje, a2, by=c("year", "type"), suffix=c("_all", "_mr"))
+eje_all$count_other <- eje_all$count_all - eje_all$count_mr
+
+tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
+  ggplot(aes(x=year, y=value, group=type, colour=name)) +
+  geom_line(aes(group=paste(type, name), linetype=type)) +
+  labs(y="Submissions received by EJE annually")
+
+gg_color_hue <- function(n) {
+  hues = seq(15, 375, length = n + 1)
+  hcl(h = hues, l = 65, c = 100)[1:n]
+}
+
+tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
+  filter(name != "count_all") %>% 
+  mutate(name = case_when(name == "count_all" ~ "All", name == "count_mr" ~ "MR papers", name == "count_other" ~ "Other papers")) %>%
+  ggplot(aes(x=as.factor(year), y=value, group=type, fill=name)) +
+  geom_bar(aes(fill=name, group=type), stat="identity", position="stack") +
+  facet_grid( ~ type) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, size=8), legend.position=c(0.88,0.78), axis.text.y=element_blank()) +
+  labs(x="Year", y="Annual submissions to EJE by country", fill="Submission type") +
+  scale_fill_manual(values=gg_color_hue(2), guide=guide_legend(reverse=TRUE))
+ggsave("docs/fig1c.pdf", width=7, height=3.5)
+```
+
+
+```{r}
+tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
+  filter(name != "count_all") %>% 
+  group_by(year, name) %>%
+  summarise(value=sum(value)) %>%
+  mutate(name = case_when(name == "count_mr" ~ "MR papers", name == "count_other" ~ "Other papers")) %>%
+  ggplot(aes(x=as.factor(year), y=value, fill=factor(name, levels=c("MR papers", "Other papers") %>% rev))) +
+  geom_bar(stat="identity", position="stack") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, size=8), legend.position="none", axis.text.y=element_blank()) +
+  labs(x="Year", y="Total annual submissions to EJE", fill="Submission type") +
+  scale_fill_manual(values=gg_color_hue(2) %>% rev, guide=guide_legend(reverse=TRUE))
+ggsave("docs/fig1b.pdf", width=7, height=3.5)
+```
+
+## Growth rates
 
 ```{r}
 calculate_exp_growth <- function(time, counts) {
     # Fit exponential model by taking log of counts
     # N(t) = N0 * e^(rt) becomes log(N(t)) = log(N0) + rt
+    counts <- counts + 1
     model <- summary(lm(log(counts) ~ time))
 
     # Extract growth coefficient (r)
@@ -152,65 +234,15 @@ calculate_exp_growth <- function(time, counts) {
 }
 
 tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
-  filter(name != "count_all") %>% 
+  filter(name != "count_all") %>%
   mutate(name = case_when(name == "count_all" ~ "All", name == "count_mr" ~ "MR papers", name == "count_other" ~ "Other papers")) %>%
-  group_by(name, type) %>%
+  group_by(name, type=type) %>%
   do({
     calculate_exp_growth(.$year, .$value)
   }) %>% as.data.frame
-
 ```
 
 
-## Add UK and USA
-
-```{r}
-table(a$country)
-a$type2 <- "All other countries"
-a$type2[a$country == "UNITED KINGDOM OF GREAT BRITAIN AND NORTHERN IRELAND"] <- "UK"
-a$type2[a$country == "UNITED STATES OF AMERICA"] <- "USA"
-a$type2[a$country == "CHINA"] <- "China"
-
-a2 <- a %>% group_by(year, type=type2) %>%
-  summarise(count=n())
-all_possible <- expand.grid(year=2015:2024, type=c("China", "UK", "USA", "All other countries"), count=0)
-code <- paste(all_possible$year, all_possible$type)
-all_possible <- subset(all_possible, ! code %in% paste(a2$year, a2$type))
-a2 <- bind_rows(a2, all_possible)
-
-ggplot(a2 %>% filter(year != 2024), aes(x=year, y=count, fill=type, group=type, colour=type)) +
-  geom_line() +
-    # geom_point(data=eje_e2, aes(x=year, y=count)) +
-    # geom_text_repel(
-    #     aes(label = type), data = eje_e2
-    # ) +
-  labs(y="MR Submissions received by EJE annually") +
-  # theme(legend.position = "none") +
-  expand_limits(y = 0) +
-  scale_colour_brewer(type="qual")
-```
-
-
-```{r}
-eje$year <- as.numeric(eje$year)
-eje_all <- full_join(eje, a2, by=c("year", "type"), suffix=c("_all", "_mr"))
-eje_all$count_other <- eje_all$count_all - eje_all$count_mr
-
-tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
-  ggplot(aes(x=year, y=value, group=type, colour=name)) +
-  geom_point() +
-  geom_line(aes(group=paste(type, name), linetype=type)) +
-  labs(y="Submissions received by EJE annually")
-
-tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
-  filter(name != "count_all", year != 2024) %>% 
-  mutate(name = case_when(name == "count_all" ~ "All", name == "count_mr" ~ "MR papers", name == "count_other" ~ "Other papers")) %>%
-  ggplot(aes(x=as.factor(year), y=value, group=type, fill=name)) +
-  geom_bar(aes(fill=name, group=type), stat="identity", position="stack") +
-  facet_grid( ~ type) +
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
-  labs(x="Year", y="Submissions received by EJE annually", fill="Submission type")
-```
 
 ## Adjusting for estimated paper mill fraction
 
