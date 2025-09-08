@@ -105,17 +105,17 @@ temp %>%
 Plot understanding exponential growth
 
 ```{r}
-temp %>%
-    ggplot(., aes(x=year, y=n, colour=country2)) + 
-    # geom_smooth(se=FALSE) + 
-    geom_line() +
-    geom_point(data=data_ends, aes(x=year, y=n, colour=country2)) +
-    geom_text_repel(
-        aes(label = country2), data = data_ends
-    ) +
-   xlim(2005,2024) +
-   theme(legend.position="none") +
-   labs(y="Number of papers", x="Year")
+    temp %>%
+        ggplot(., aes(x=year, y=n, colour=country2)) + 
+        # geom_smooth(se=FALSE) + 
+        geom_line() +
+        geom_point(data=data_ends, aes(x=year, y=n, colour=country2)) +
+        geom_text_repel(
+            aes(label = country2), data = data_ends
+        ) +
+    xlim(2005,2024) +
+    theme(legend.position="none") +
+    labs(y="Number of papers", x="Year")
 ggsave("country.pdf", width=8, height=4)
 ```
 
@@ -364,8 +364,16 @@ lapply(unique(authors2$year), function(x) {
     ncountry <- n_distinct(temp$V2)
     tibble(year=x, ncountry=ncountry)
 }) %>% bind_rows() %>%
-ggplot(., aes(x=year, y=ncountry)) + geom_line() + geom_point() + labs(y="Number of countries", x="Year")
+ggplot(., aes(x=year, y=ncountry)) + geom_line() + geom_point() + labs(y="Cumulative number of countries", x="Year")
 
+lapply(unique(authors2$year), function(x) {
+    temp <- authors2 %>% filter(year == x)
+    ncountry <- n_distinct(temp$V2)
+    tibble(year=x, ncountry=ncountry)
+}) %>% bind_rows() %>%
+filter(year != 2025) %>%
+ggplot(., aes(x=year, y=ncountry)) + geom_line() + geom_point() + labs(y="Annual number of countries contributing MR papers", x="Year")
+ggsave(here("docs", "fig1d.pdf"), width=7, height=4)
 
 ```
 
@@ -453,3 +461,200 @@ orig_abstracts_summary %>%
 ggsave(here("docs", "fig1a.pdf"), width=7, height=7)
 ```
 
+
+Plot by continent
+
+```{r}
+library(readxl)
+continents <- read_xlsx(here("data", "country-list.xlsx"))
+continents
+
+orig_abstracts2 <- jsonlite::read_json(here("data/pubmed_abstracts_20250519.json"))
+orig_abstracts$country %>% unique() %>% sort()
+
+orig_abstracts2 <- lapply(orig_abstracts2, function(x) {
+    as_tibble(x)
+}) %>% bind_rows()
+
+author_results$country %>% unique() %>% sort()
+country_mapping <- read.csv(here("data", "countries.csv"), header=F)
+
+table(author_results$country %>% unique() %>% sort() %in% country_mapping$V1)
+author_results <- left_join(author_results, country_mapping, by=c("country"="V1"))
+table(author_results$V2 %in% continents$Country)
+subset(author_results, !V2 %in% continents$Country)$V2 %>% unique() %>% sort()
+
+
+update_names <- tribble(
+~V2, ~country2,
+"Czech Republic", "Czechia",
+"Hong Kong", "China, Hong Kong Special Administrative Region",
+"Iran", "Iran (Islamic Republic of)",
+"Russia", "Russian Federation",
+"South Korea", "Republic of Korea",
+"The Netherlands", "Netherlands",
+"United Kingdom", "United Kingdom of Great Britain and Northern Ireland",
+"USA", "United States of America"
+)
+
+author_results$V3 <- update_names$country2[match(author_results$V2, update_names$V2)]
+author_results$V3[is.na(author_results$V3)] <- author_results$V2[is.na(author_results$V3)]
+
+table(author_results$V3 %in% continents$Country)
+subset(author_results, !V3 %in% continents$Country)$V3 %>% unique() %>% sort()
+```
+
+```{r}
+unique_countries <- unique(c(author_results$country, author_results$V2, author_results$V3)) %>% na.omit()
+unique_countries <- unique_countries[! unique_countries %in% c("", "CA", "PA", "US", "SAU", "CN")]
+orig_abstracts_countries <- lapply(unique_countries, \(i) {
+    ind <- grepl(i, orig_abstracts$author_affil, ignore.case=TRUE)
+    tibble(country=i, pmid=orig_abstracts$pmid[ind])
+}) %>% bind_rows()
+dim(orig_abstracts_countries)
+length(unique(orig_abstracts_countries$pmid))
+table(orig_abstracts_countries$country %in% author_results$country)
+
+country_mapping2 <- subset(author_results, !duplicated(country), select=c(country, V2, V3))
+
+orig_abstracts_countries <- left_join(orig_abstracts_countries, country_mapping2, by=c("country"="country"))
+table(is.na(orig_abstracts_countries$country))
+
+orig_abstracts_countries$V3[orig_abstracts_countries$country == "Hong Kong Special Administrative Region of China"] <- "China, Hong Kong Special Administrative Region"
+orig_abstracts_countries$V3[orig_abstracts_countries$country == "Russian Federation"] <- "Russian Federation"
+orig_abstracts_countries$V3[orig_abstracts_countries$country == "CHN"] <- "China"
+orig_abstracts_countries$V3[orig_abstracts_countries$country == "Country"] <- NA
+orig_abstracts_countries$V3[orig_abstracts_countries$country == "Indonesia"] <- "Indonesia"
+orig_abstracts_countries$V3[orig_abstracts_countries$country == "Saudi Arabia"] <- "Saudi Arabia"
+orig_abstracts_countries$V3[orig_abstracts_countries$country == "United Kingdom of Great Britain and Northern Ireland"] <- "United Kingdom of Great Britain and Northern Ireland"
+
+orig_abstracts_countries <- left_join(orig_abstracts_countries, continents, by=c("V3"="Country"))
+table(is.na(orig_abstracts_countries$continent))
+
+subset(orig_abstracts_countries, is.na(continent))$country %>% unique() %>% sort()
+
+str(orig_abstracts_countries)
+
+orig_abstracts2j <- left_join(orig_abstracts %>% select(-country), orig_abstracts_countries, by="pmid")
+dim(orig_abstracts2j)
+
+orig_abstracts2j_collapsed <- orig_abstracts2j %>% group_by(pmid) %>%
+    summarise(
+        year=first(year),
+        country = paste(sort(unique(na.omit(V3))), collapse="; "),
+        continent = paste(sort(unique(na.omit(continent))), collapse="; "),
+        region1 = paste(sort(unique(na.omit(region1))), collapse="; ")
+    )
+
+
+
+
+orig_abstracts_summary_continent_col <- orig_abstracts2j_collapsed %>%
+    filter(!is.na(continent)) %>%
+    group_by(year, country=continent) %>%
+    summarise(n=n())
+
+orig_abstracts_summary_continent <- orig_abstracts2j %>%
+    filter(!is.na(continent)) %>%
+    group_by(year, country=continent) %>%
+    summarise(n=n())
+
+orig_abstracts_summary_region <- orig_abstracts2j %>%
+    filter(!is.na(continent)) %>%
+    group_by(year, country=region1) %>%
+    summarise(n=n())
+
+
+
+data_ends_continent_col <- filter(orig_abstracts_summary_continent_col, year == "2024")
+data_ends_continent <- filter(orig_abstracts_summary_continent, year == "2024")
+data_ends_region <- filter(orig_abstracts_summary_region, year == "2024")
+
+orig_abstracts_summary_continent %>%
+    ggplot(., aes(x=year, y=n, colour=country)) + 
+    geom_line() +
+    geom_point() +
+    xlim(2003,2024) +
+    theme(legend.position="none") +
+    geom_text_repel(aes(label = country), data = data_ends_continent) +
+    labs(y="Number of papers", x="Year") +
+    theme(axis.text.x=element_text(angle=45, hjust=1))
+
+orig_abstracts_summary_region %>%
+    ggplot(., aes(x=year, y=n, colour=country)) + 
+    geom_line() +
+    geom_point() +
+    xlim(2003,2024) +
+    theme(legend.position="none") +
+    geom_text_repel(aes(label = country), data = data_ends_region) +
+    labs(y="Number of papers", x="Year") +
+    theme(axis.text.x=element_text(angle=45, hjust=1)) +
+    scale_y_log10()
+
+orig_abstracts_summary_continent %>%
+    ggplot(., aes(x=year, y=n, colour=country)) + 
+    geom_line() +
+    geom_point() +
+    xlim(2003,2024) +
+    theme(legend.position="none") +
+    geom_text_repel(aes(label = country), data = data_ends_continent) +
+    labs(y="Number of papers", x="Year") +
+    theme(axis.text.x=element_text(angle=45, hjust=1)) +
+    scale_y_log10()
+
+pmids_to_check <- subset(orig_abstracts2j_collapsed, continent == "Asia; North America")$pmid
+
+affils <- orig_abstracts2$author_affil[orig_abstracts2$pmid %in% pmids_to_check]
+
+affils[1]
+
+for(i in unique_countries) {
+    if(grepl(i, affils[1], ignore.case=TRUE, )) print(i)
+}
+
+
+```
+
+```{r}
+region_sizes <- tribble(
+    ~region1, ~pop,
+    "Southern Asia",	1989452478,
+    "Northern Europe",	106197357,
+    "Southern Europe",	152130606,
+    "Northern Africa",	255737736,
+    "Polynesia",	717467,
+    "Middle Africa",	190267973,
+    "Caribbean",	656098097,
+    "Antarctica",	0,
+    "South America",	434254119,
+    "Western Asia",	289733123,
+    "Australia and New Zealand",	31050816,
+    "Western Europe",	195381649,
+    "Eastern Europe",	291464162,
+    "Central America",	177661929,
+    "Western Africa",	418544337,
+    "Northern America",	375278947,
+    "Southern Africa",	67984554,
+    "Eastern Africa",	461141845,
+    "South-eastern Asia",	675796065,
+    "Eastern Asia",	1663696923,
+    "Melanesia",	12188834,
+    "Micronesia",	534606,
+    "Central Asia",	75897577
+)
+
+orig_abstracts_summary_region_size <- left_join(orig_abstracts_summary_region, region_sizes, by=c("country"="region1")) %>%
+    mutate(n_per_million = n / (pop / 1e6))
+data_ends_region <- filter(orig_abstracts_summary_region_size, year == "2024")
+
+orig_abstracts_summary_region_size %>%
+    ggplot(., aes(x=year, y=n_per_million, colour=country)) + 
+    geom_line() +
+    geom_point() +
+    xlim(2003,2024) +
+    theme(legend.position="none") +
+    geom_text_repel(aes(label = country), data = data_ends_region) +
+    labs(y="Number of papers per 1 million population size", x="Year") +
+    theme(axis.text.x=element_text(angle=45, hjust=1))
+ggsave(here("docs", "fig1ap.pdf"), width=7, height=7)
+```

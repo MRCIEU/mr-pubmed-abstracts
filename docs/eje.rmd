@@ -181,6 +181,24 @@ tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
 ggsave("docs/fig1c.pdf", width=7, height=3.5)
 ```
 
+```{r}
+tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
+  filter(name != "count_all") %>% 
+  mutate(name = case_when(name == "count_all" ~ "All", name == "count_mr" ~ "MR papers", name == "count_other" ~ "Other papers")) %>%
+  group_by(year, type) %>%
+  mutate(perc = value / sum(value) * 100) %>% filter(year %in% c(2020, 2024))
+```
+
+```{r}
+tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
+  filter(name != "count_all") %>% 
+  mutate(name = case_when(name == "count_all" ~ "All", name == "count_mr" ~ "MR papers", name == "count_other" ~ "Other papers")) %>%
+  group_by(year, name) %>%
+  summarise(value = sum(value)) %>%
+  ungroup() %>%
+  group_by(year) %>%
+  mutate(perc = value / sum(value) * 100) %>% filter(year %in% c(2020, 2024))
+```
 
 ```{r}
 tidyr::pivot_longer(eje_all, c(count_all, count_mr, count_other)) %>%
