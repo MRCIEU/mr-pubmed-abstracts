@@ -377,6 +377,79 @@ ggsave(here("docs", "fig1d.pdf"), width=7, height=4)
 
 ```
 
+Include SDI
+
+```{r}
+authors2$V3 <- authors2$V2
+authors2$V3[authors2$V2 == "USA"] <- "United States"
+authors2$V3[authors2$V2 == "The Netherlands"] <- "Netherlands"
+
+
+sdi <- read.csv(here("data", "sdi.csv"))
+v3_unique <- unique(authors2$V3)
+table(v3_unique %in% sdi$Location)
+v3_unique[! v3_unique %in% sdi$Location] %>% sort()
+
+authors3 <- left_join(authors2, sdi, by=c("V3"="Location"))
+table(authors3$SDI)
+
+```
+
+
+```{r}
+res_sdi <- lapply(unique(authors3$year), function(x) {
+    temp <- authors3 %>% filter(year == x) %>% filter(!duplicated(V3))
+    group_by(temp, SDI) %>%
+        summarise(ncountry=n()) %>%
+        mutate(year=x)
+}) %>% bind_rows() %>%
+filter(year != 2025)
+
+group_by(res_sdi, year) %>%
+    summarise(ncountry=sum(ncountry))
+
+res_sdi$SDI <- factor(res_sdi$SDI, levels=c("High SDI", "High-middle SDI", "Middle SDI", "Low-middle SDI", "Low SDI"))
+
+ggplot(res_sdi, aes(x=year, y=ncountry, colour=SDI)) + geom_line() + geom_point() + labs(y="Annual number of countries contributing MR papers", x="Year") + theme(legend.position="bottom")
+
+ggplot(res_sdi %>% filter(!is.na(SDI)), aes(x=year, y=ncountry, fill=SDI)) + geom_bar(stat="identity", position="stack") + labs(y="Annual number of countries contributing MR papers", x="Year") + theme(legend.position="bottom") +
+scale_fill_brewer(type="qual")
+ggsave(here("docs", "sdi.pdf"), width=7, height=7)
+```
+
+
+continents
+
+```{r}
+continents <- read.csv(here("data", "continent.csv"))
+v3_unique <- unique(authors3$V3)
+table(v3_unique %in% continents$country)
+v3_unique[! v3_unique %in% continents$country] %>% sort()
+authors4 <- left_join(authors3, continents, by=c("V3"="country"))
+table(authors4$continent)
+
+res_continents <- lapply(unique(authors4$year), function(x) {
+    temp <- authors4 %>% filter(year == x) %>% filter(!duplicated(V3))
+    group_by(temp, continent) %>%
+        summarise(ncountry=n()) %>%
+        mutate(year=x)
+}) %>% bind_rows() %>%
+filter(year != 2025)
+
+res_continents
+
+group_by(res_continents, year) %>%
+    summarise(ncountry=sum(ncountry))
+
+ggplot(res_continents %>% filter(!is.na(continent)), aes(x=year, y=ncountry, fill=continent)) + geom_bar(stat="identity", position="stack") + labs(y="Annual number of countries contributing MR papers", x="Year") + theme(legend.position="bottom") +
+scale_fill_brewer(type="qual")
+ggsave(here("docs", "continents.pdf"), width=7, height=7)
+
+```
+
+
+
+
 
 ## Manual check of the data
 
