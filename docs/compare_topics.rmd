@@ -56,6 +56,13 @@ dat %>%
 ggplot(., aes(x=Year, y=countn, color=search)) + geom_line() + geom_point() + scale_colour_brewer(type="qual")
 ```
 
+```{r}
+dat %>%
+    filter(Year >= 2000 & Year <= 2024) %>%
+ggplot(., aes(x=Year, y=Count, color=search)) + geom_line() + geom_point() + scale_colour_brewer(type="qual")
+```
+
+
 Normalise by the number of publications in PubMed in general.
 
 ```{r}
@@ -66,8 +73,18 @@ pby <- pby %>% gather(key="search", value="count_ratio", -Year)
 
 dat <- left_join(dat, pby, by=c("Year", "search"))
 dat <- group_by(dat, search) %>% mutate(count_ratio_norm = count_ratio/max(count_ratio, na.rm=T)) %>% ungroup()
+dat$count_ratio <- dat$count_ratio / max(dat$count_ratio, na.rm=T) * max(dat$Count, na.rm=T)
 
-dat %>% ggplot(., aes(x=Year, y=count_ratio, color=search)) + geom_line() + geom_point() + scale_colour_brewer(type="qual")
+dat %>% 
+    filter(Year >= 1985 & Year <=2024) %>%
+    ggplot(., aes(x=Year, y=count_ratio, color=search)) + 
+    geom_line() + 
+    geom_point() + 
+    scale_colour_brewer(type="qual", palette=3) +
+    labs(colour="Study type", y="Annual number of studies in PubMed", x="Year") +
+    theme_bw() +
+    theme(legend.position=c(0.2, 0.7))
+ggsave(file=here("docs/topic_growth.pdf"), width=6, height=4)
 ```
 
 Normalising by number of pubmed publications doesn't actually change the shape that much for these topics. Try normalising by the maximum number of publications for each search term.
@@ -101,7 +118,7 @@ calculate_exp_growth <- function(time, counts) {
     return(list(
         growth_coefficient = r,
         r_squared = r_squared,
-        doubling_time = doubling_time,
+        doubling_time = doubling_time %>% round(2),
         initial_value = exp(coef(model)[1])
     ) %>% as_tibble())
 }
@@ -119,7 +136,7 @@ l[[2]] <- dat %>% filter(Year <= 2024) %>%
         calculate_exp_growth(x$Year, x$count_ratio)
     }) %>% select(search, doubling_time_all = doubling_time)
 
-l[[3]] <- group_by(dat, search) %>% summarise(total = sum(Count), count_2024 = max(Count), ratio = count_2024 / total)
+l[[3]] <- group_by(dat, search) %>% summarise(total = sum(Count), count_2024 = max(Count), ratio = round(count_2024 / total, 2))
 
 Reduce(function(x, y) merge(x, y, by="search"), l) %>% arrange(desc(ratio)) %>% knitr::kable()
 ```
