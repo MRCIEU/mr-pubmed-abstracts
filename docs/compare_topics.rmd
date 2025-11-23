@@ -21,15 +21,14 @@ library(knitr)
 library(here)
 
 read_data <- function(ind, search) {
-    a <- read.csv(here("data", "pubmed_counts", paste0("PubMed_Timeline_results_by_Year-", ind, ".csv")), skip=1, header=TRUE) %>% mutate(search = search)
+    a <- read.csv(here("data", "pubmed_counts", paste0("PubMed_Timeline_results_by_Year(", ind, ").csv")), skip=1, header=TRUE) %>% mutate(search = search)
     return(a)
 }
 
-dat <- tibble(ind=3:7, search=c("MR", "GWAS", "Systematic reviews", "Meta-analysis", "Mediation analysis")) %>% pmap(., read_data) %>% bind_rows() %>% as_tibble()
+dat <- tibble(ind=1:5, search=c("MR", "GWAS", "Systematic reviews", "Meta-analysis", "Mediation analysis")) %>% pmap(., read_data) %>% bind_rows() %>% as_tibble()
 dat <- subset(dat, ! (search == "Systematic reviews" & Year < 1970))
 dat <- subset(dat, ! (search == "GWAS" & Year < 1999))
 dat <- subset(dat, Year <= 2024)
-dat$Year[dat$Year == 2024] <- 2023 + 11/12
 range01 <- function(x){(x-min(x))/(max(x)-min(x))}
 dat <- group_by(dat, search) %>% filter(Count != 0 & Year <= 2024) %>% mutate(countn = Count / max(Count), time = range01(Year)) %>% ungroup()
 
@@ -67,7 +66,7 @@ Normalise by the number of publications in PubMed in general.
 
 ```{r}
 # From https://esperr.github.io/pubmed-by-year/
-pby <- read.csv(here("data/pubmed_counts/PubMed by Year.csv"), header=TRUE) %>% as_tibble()
+pby <- read.csv(here("data/pubmed_counts/PubMed by Year(1).csv"), header=TRUE) %>% as_tibble()
 names(pby)[-1] <- unique(dat$search)
 pby <- pby %>% gather(key="search", value="count_ratio", -Year) 
 
@@ -87,11 +86,44 @@ dat %>%
 ggsave(file=here("docs/topic_growth.pdf"), width=6, height=4)
 ```
 
+Log y-axis
+
+```{r}
+dat %>% 
+    filter(Year >= 1985 & Year <=2024) %>%
+    ggplot(., aes(x=Year, y=count_ratio, color=search)) + 
+    geom_line() + 
+    geom_point() + 
+    scale_colour_brewer(type="qual", palette=3) +
+    labs(colour="Study type", y="Annual number of studies in PubMed", x="Year") +
+    theme_bw() +
+    theme(legend.position=c(0.2, 0.7)) +
+    geom_smooth(se=FALSE, method="lm") +
+    scale_y_log10()
+```
+
+
+```{r}
+
+dat %>% 
+    filter(Year >= 2003 & Year <=2024) %>%
+    ggplot(., aes(x=Year, y=count_ratio, color=search)) + 
+    geom_line() + 
+    geom_point() + 
+    scale_colour_brewer(type="qual", palette=3) +
+    labs(colour="Study type", y="Annual number of studies in PubMed", x="Year") +
+    theme_bw() +
+    theme(legend.position=c(0.2, 0.7)) +
+    geom_smooth(se=FALSE, method="lm") +
+    scale_y_log10()
+
+```
+
 Normalising by number of pubmed publications doesn't actually change the shape that much for these topics. Try normalising by the maximum number of publications for each search term.
 
 ```{r}
-dat <- group_by(dat, search) %>% mutate(count_ratio_norm = count_ratio / max(count_ratio, na.rm=T)) %>% ungroup()
-dat %>% ggplot(., aes(x=Year, y=count_ratio_norm, color=search)) + geom_line() + geom_point() + scale_colour_brewer(type="qual")
+dat2 <- group_by(dat, search) %>% mutate(count_ratio_norm = count_ratio / max(count_ratio, na.rm=T)) %>% ungroup()
+dat2 %>% ggplot(., aes(x=Year, y=count_ratio_norm, color=search)) + geom_line() + geom_point() + scale_colour_brewer(type="qual")
 ```
 
 Similar story to before standardising by the number of pubmed publications.
@@ -119,12 +151,13 @@ calculate_exp_growth <- function(time, counts) {
         growth_coefficient = r,
         r_squared = r_squared,
         doubling_time = doubling_time %>% round(2),
-        initial_value = exp(coef(model)[1])
+        initial_value = exp(coef(model)[1]),
+        nyears = length(time)
     ) %>% as_tibble())
 }
 
 l <- list()
-l[[1]] <- dat %>% filter(Year >= 2000 & Year <= 2024) %>%
+l[[1]] <- dat %>% filter(Year >= 2003 & Year <= 2024) %>%
     group_by(search) %>% do({
         calculate_exp_growth(.$Year, .$countn)
     }) %>% select(search, doubling_time_2003 = doubling_time)
@@ -132,13 +165,15 @@ l[[1]] <- dat %>% filter(Year >= 2000 & Year <= 2024) %>%
 l[[2]] <- dat %>% filter(Year <= 2024) %>%
     group_by(search) %>% do({
         x <- .
-        x <- subset(x, Count != 0)
-        calculate_exp_growth(x$Year, x$count_ratio)
+        calculate_exp_growth(x$Year, x$countn)
     }) %>% select(search, doubling_time_all = doubling_time)
 
 l[[3]] <- group_by(dat, search) %>% summarise(total = sum(Count), count_2024 = max(Count), ratio = round(count_2024 / total, 2))
 
-Reduce(function(x, y) merge(x, y, by="search"), l) %>% arrange(desc(ratio)) %>% knitr::kable()
+growth <- Reduce(function(x, y) merge(x, y, by="search"), l) %>% arrange(desc(ratio))
+names(growth) <- c("Study type", "Doubling time (years) since 2003", "Doubling time (years) all time", "Total studies", "Studies in 2024", "ratio")
+write.csv(growth, here("docs/growth.csv"), row.names=FALSE)
+growth %>% knitr::kable()
 ```
 
 - `doubling_time_2003`: Doubling time from 2003 to 2024
@@ -147,3 +182,9 @@ Reduce(function(x, y) merge(x, y, by="search"), l) %>% arrange(desc(ratio)) %>% 
 - `ratio`: Ratio of the number of publications in 2024 to the total number of publications
 
 To summarise, MR does have a relatively fast doubling time compared to other similar topics. However it is not an extreme outlier in terms of its rapid growth.
+
+
+```{r}
+
+```
+
